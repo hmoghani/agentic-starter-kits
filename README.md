@@ -156,6 +156,7 @@ See `tests/behavioral/` for full details.
 - [Adding Behavioral Tests](./docs/adding-behavioral-tests.md) — How to add test coverage for an agent
 - [Adding an EvalHub Agent Integration](./docs/adding-evalhub-agent-integration.md) — How to integrate a new agent into the EvalHub evaluation pipeline
 - [llm-d Deployment](./docs/llm-d-deployment.md) — Deploy llm-d for intelligent LLM inference routing on OpenShift AI
+- [OpenShell Sandbox Evaluation](./docs/openshell-sandbox-evaluation.md) — Spike findings on OpenShell sandbox integration with validated agent runtimes
 
 ## Additional Resources
 
