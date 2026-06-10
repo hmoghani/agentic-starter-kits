@@ -1,14 +1,45 @@
-FROM ghcr.io/pilinux/opencode:latest
+# OpenCode agent for OpenShell sandbox
+#
+# UBI-based image for running SST OpenCode inside an OpenShell sandbox.
+#
+# Build:
+#   podman build --platform linux/amd64 -t opencode-sandbox:latest -f Containerfile.openshell .
 
-USER root
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        iproute2 \
+ARG OPENCODE_VERSION=1.17.1
+ARG USER_UID=1001
+ARG USER_GID=0
+
+# Install system dependencies and Node.js
+RUN microdnf install -y --nodocs \
+        git \
+        curl \
         tar \
-    && rm -rf /var/lib/apt/lists/* && \
-    useradd -m -s /bin/bash -d /sandbox sandbox && \
-    groupadd -f sandbox && \
-    usermod -aG sandbox sandbox
+        iproute \
+        nodejs \
+        npm \
+    && microdnf clean all \
+    && rm -rf /var/cache/yum
 
-USER sandbox
-WORKDIR /sandbox
+# Create sandbox user (GID=0 for OpenShift arbitrary-UID compatibility)
+RUN useradd -u ${USER_UID} -g ${USER_GID} -d /sandbox -m -s /bin/bash sandbox && \
+    groupadd -f sandbox
+
+# Create workspace directory
+RUN mkdir -p /workspace && \
+    chown -R ${USER_UID}:${USER_GID} /workspace && \
+    chmod -R 775 /workspace
+
+# Ensure sandbox home is group-writable for OpenShift random UID
+RUN chown -R ${USER_UID}:${USER_GID} /sandbox && \
+    chmod -R 775 /sandbox
+
+# Install OpenCode as root (MIT)
+RUN npm install -g opencode-ai@${OPENCODE_VERSION}
+
+# Verify installation
+RUN opencode --version
+
+USER ${USER_UID}
+WORKDIR /workspace

@@ -1108,13 +1108,21 @@ podman build --platform linux/amd64 -t claude-sandbox:latest -f Containerfile.op
 
 ### Create a sandbox
 
+Using an OpenShell provider (recommended — credentials are managed by the supervisor proxy and never exposed to the agent):
+
+```bash
+openshell sandbox create --from claude-sandbox:latest
+```
+
+Or by passing the API key directly as an environment variable:
+
 ```bash
 openshell sandbox create --from claude-sandbox:latest -e ANTHROPIC_API_KEY=sk-...
 ```
 
 ### What `Containerfile.openshell` changes
 
-- Renames the container user from `claude-agent` to `sandbox` (required by OpenShell)
+- Uses `sandbox` user instead of `claude-agent` (required by OpenShell)
 - Adds `tar` and `iproute` packages (required by OpenShell's supervisor and network isolation)
 - All other functionality (Claude Code installation, entrypoint, skills mounting) remains the same
 

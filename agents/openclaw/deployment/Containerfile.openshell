@@ -1,13 +1,45 @@
-FROM ghcr.io/openclaw/openclaw:latest
+# OpenClaw agent for OpenShell sandbox
+#
+# UBI-based image for running OpenClaw inside an OpenShell sandbox.
+#
+# Build:
+#   podman build --platform linux/amd64 -t openclaw-sandbox:latest -f Containerfile.openshell .
 
-USER root
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        iproute2 \
-    && rm -rf /var/lib/apt/lists/* && \
-    useradd -m -s /bin/bash -d /sandbox sandbox && \
-    groupadd -f sandbox && \
-    usermod -aG sandbox sandbox
+ARG OPENCLAW_VERSION=2026.6.5
+ARG USER_UID=1001
+ARG USER_GID=0
 
-USER sandbox
-WORKDIR /sandbox
+# Install system dependencies and Node.js
+RUN microdnf install -y --nodocs \
+        git \
+        curl \
+        tar \
+        iproute \
+        nodejs \
+        npm \
+    && microdnf clean all \
+    && rm -rf /var/cache/yum
+
+# Create sandbox user (GID=0 for OpenShift arbitrary-UID compatibility)
+RUN useradd -u ${USER_UID} -g ${USER_GID} -d /sandbox -m -s /bin/bash sandbox && \
+    groupadd -f sandbox
+
+# Create workspace directory
+RUN mkdir -p /workspace && \
+    chown -R ${USER_UID}:${USER_GID} /workspace && \
+    chmod -R 775 /workspace
+
+# Ensure sandbox home is group-writable for OpenShift random UID
+RUN chown -R ${USER_UID}:${USER_GID} /sandbox && \
+    chmod -R 775 /sandbox
+
+# Install OpenClaw as root (MIT)
+RUN npm install -g openclaw@${OPENCLAW_VERSION}
+
+# Verify installation
+RUN openclaw --version
+
+USER ${USER_UID}
+WORKDIR /workspace

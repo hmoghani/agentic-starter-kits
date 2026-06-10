@@ -147,7 +147,7 @@ USER ${USER_UID}
 # If a gateway/API layer is added later, ports can be exposed
 
 # Entrypoint handles environment setup and runs Claude Code
-ENTRYPOINT ["entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Default command - can be overridden at runtime
 # This runs Claude in print (non-interactive) mode with stream-json for programmatic interaction
