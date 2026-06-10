@@ -1108,10 +1108,17 @@ podman build --platform linux/amd64 -t claude-sandbox:latest -f Containerfile.op
 
 ### Create a sandbox
 
-Using an OpenShell provider (recommended — credentials are managed by the supervisor proxy and never exposed to the agent):
+Using an OpenShell provider (recommended — credentials are managed by the gateway and never exposed to the agent):
 
 ```bash
-openshell sandbox create --from claude-sandbox:latest
+# Create a provider once (stored in the gateway, reusable across sandboxes)
+openshell provider create \
+  --name claude \
+  --type claude-code \
+  --credential ANTHROPIC_API_KEY=sk-...
+
+# Create sandboxes using the provider
+openshell sandbox create --from claude-sandbox:latest --provider claude
 ```
 
 Or by passing the API key directly as an environment variable:
