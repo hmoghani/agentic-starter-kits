@@ -97,7 +97,7 @@ See [docs/raw-deployment.md](docs/raw-deployment.md) for the full walkthrough, c
 
 ## Running in an OpenShell Sandbox
 
-To run OpenClaw inside an [OpenShell](https://github.com/NVIDIA/OpenShell-Community) sandbox, use the `Containerfile.openshell`. This wraps the upstream OpenClaw image and adds the `sandbox` user/group and `iproute2` package that OpenShell requires.
+To run OpenClaw inside an [OpenShell](https://github.com/NVIDIA/OpenShell-Community) sandbox, use the `Containerfile.openshell`. This builds from UBI 10 minimal, installs OpenClaw via npm, and adds the `sandbox` user/group and system packages that OpenShell requires.
 
 ### Build the OpenShell-compatible image
 
@@ -111,10 +111,15 @@ podman build --platform linux/amd64 -t openclaw-sandbox:latest -f Containerfile.
 openshell sandbox create --from openclaw-sandbox:latest
 ```
 
-### What `Containerfile.openshell` adds
+### What `Containerfile.openshell` does
 
-- `sandbox` user and group (required by OpenShell)
-- `iproute2` package (required by OpenShell's network isolation)
+Builds from UBI 10 minimal (`registry.access.redhat.com/ubi10/ubi-minimal:10.1`) and installs:
+
+- Node.js and npm (from UBI repos)
+- OpenClaw via npm (version pinned, MIT)
+- `sandbox` user with GID=0 (required by OpenShell and OpenShift arbitrary-UID)
+- `iproute` and `tar` packages (required by OpenShell's supervisor and network isolation)
+- `/workspace` directory with group-writable permissions
 
 ### Notes
 

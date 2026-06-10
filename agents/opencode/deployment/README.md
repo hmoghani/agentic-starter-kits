@@ -17,13 +17,16 @@ openshell sandbox create --from opencode-sandbox:latest
 
 ## What `Containerfile.openshell` does
 
-Wraps the community OpenCode image (`ghcr.io/pilinux/opencode:latest`) and adds:
+Builds from UBI 10 minimal (`registry.access.redhat.com/ubi10/ubi-minimal:10.1`) and installs:
 
-- `sandbox` user and group (required by OpenShell)
-- `iproute2` and `tar` packages (required by OpenShell's supervisor and network isolation)
+- Node.js and npm (from UBI repos)
+- OpenCode via npm (version pinned, MIT)
+- `sandbox` user with GID=0 (required by OpenShell and OpenShift arbitrary-UID)
+- `iproute` and `tar` packages (required by OpenShell's supervisor and network isolation)
+- `/workspace` directory with group-writable permissions
 
 ## Notes
 
 - OpenShell's supervisor takes over as PID 1 and does not automatically run OpenCode. Start it manually inside the sandbox.
 - Build with `--platform linux/amd64` when targeting x86_64 clusters from Apple Silicon machines.
-- Tested on OpenShell v0.0.58, OpenShift 4.21 (June 2026). OpenCode version 1.16.2.
+- Tested on OpenShell v0.0.58, OpenShift 4.21 (June 2026). OpenCode version 1.17.1.
