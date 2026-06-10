@@ -1,0 +1,157 @@
+# Claude Code Container for Red Hat OpenShift AI
+#
+# A customer-facing container image for running Claude Code on RHOAI.
+# Defaults to headless (non-interactive) mode for programmatic use.
+# Interactive mode available by overriding CMD at runtime.
+#
+# Features:
+# - UBI 10 minimal base (RHEL-compatible, supported)
+# - Claude Code installed via native installer (version-pinned)
+# - Non-root user compatible with restricted-v2 SCC
+# - Configurable API endpoint (Anthropic, vLLM, OGX)
+# - Skills injectable at runtime via ConfigMap/PVC mount
+# - MCP configuration injectable at runtime via environment variables:
+#     MCP_CONFIG_FILE - path to mounted JSON config file
+#     MCP_CONFIG_JSON - inline JSON string with MCP server definitions
+#
+# Build:
+#   podman build -t claude-code:latest -f Containerfile .
+#
+# Build with specific version:
+#   podman build --build-arg CLAUDE_CODE_VERSION=2.1.123 -t claude-code:2.1.123 .
+
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.1
+
+LABEL name="claude-code" \
+      vendor="Red Hat" \
+      summary="Claude Code agent for OpenShift AI" \
+      description="Container image for running Anthropic's Claude Code CLI on Red Hat OpenShift AI"
+
+# =============================================================================
+# Build Arguments
+# =============================================================================
+
+# Claude Code version to install (pinned for reproducibility)
+ARG CLAUDE_CODE_VERSION=2.1.123
+
+# User configuration
+ARG USER_NAME=sandbox
+ARG USER_UID=1001
+ARG USER_GID=0
+
+# =============================================================================
+# Install System Dependencies
+# =============================================================================
+
+# Install minimal utilities
+# - git: Version control (agent may need to clone repos)
+# - curl: HTTP client (agent may need to fetch resources, also used by installer)
+# - jq: JSON processor (useful for scripting)
+RUN microdnf install -y --nodocs \
+        git \
+        curl \
+        jq \
+        tar \
+        iproute \
+    && microdnf clean all \
+    && rm -rf /var/cache/yum
+
+# =============================================================================
+# Create Non-Root User
+# =============================================================================
+
+# Create user with specific UID for OpenShift compatibility
+# GID=0 (root group) is required for OpenShift's random UID assignment.
+# OpenShift runs containers with a random UID that is a member of GID 0.
+# Directories below use chmod 775 so GID 0 members have write access.
+RUN useradd -u ${USER_UID} -g ${USER_GID} -d /sandbox -m -s /bin/bash ${USER_NAME} && \
+    groupadd -f sandbox
+
+# =============================================================================
+# Create Directory Structure
+# =============================================================================
+
+# Skills directory - empty, mountable via ConfigMap/PVC
+# Claude Code auto-discovers skills from ~/.claude/skills/
+# Each skill is a subdirectory containing a SKILL.md file
+# Structure: ~/.claude/skills/<skill-name>/SKILL.md
+#
+# Mount at runtime:
+#   podman run -v /path/to/skills:/home/claude-agent/.claude/skills:ro,z ...
+#   Or in OpenShift, mount a ConfigMap or PVC to /home/claude-agent/.claude/skills
+RUN mkdir -p /sandbox/.claude/skills \
+    && chown -R ${USER_UID}:${USER_GID} /sandbox/.claude/skills \
+    && chmod -R 775 /sandbox/.claude/skills
+
+# Workspace directory - for agent working files
+# Can be mounted with PVC for persistence
+RUN mkdir -p /workspace \
+    && chown -R ${USER_UID}:${USER_GID} /workspace \
+    && chmod -R 775 /workspace
+
+# Claude config directory
+RUN mkdir -p /sandbox/.claude \
+    && chown -R ${USER_UID}:${USER_GID} /sandbox/.claude \
+    && chmod -R 775 /sandbox/.claude
+
+# Ensure home directory has correct permissions for OpenShift random UID
+RUN chown -R ${USER_UID}:${USER_GID} /sandbox \
+    && chmod -R 775 /sandbox
+
+# =============================================================================
+# Install Claude Code (as non-root user)
+# =============================================================================
+
+# Switch to non-root user for installation
+# The native installer writes to $HOME/.claude/local/
+USER ${USER_UID}
+
+# Install Claude Code via native installer with pinned version
+# Version pinning: pass version as argument to install.sh
+RUN curl -fsSL https://claude.ai/install.sh | bash -s -- "${CLAUDE_CODE_VERSION}"
+
+# Add Claude to PATH (native installer puts it in ~/.local/bin)
+ENV PATH="/sandbox/.local/bin:${PATH}" \
+    HOME="/sandbox"
+
+# Verify installation
+RUN claude --version
+
+# Switch back to root for remaining setup
+USER 0
+
+# =============================================================================
+# Copy Entrypoint
+# =============================================================================
+
+COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# =============================================================================
+# Environment Configuration
+# =============================================================================
+
+# Disable Claude Code auto-updater (we control versions via image builds)
+ENV DISABLE_AUTOUPDATER=1
+
+# Default working directory
+WORKDIR /workspace
+
+# =============================================================================
+# Runtime Configuration
+# =============================================================================
+
+# Switch to non-root user
+USER ${USER_UID}
+
+# Expose no ports by default (Claude Code is CLI-based)
+# If a gateway/API layer is added later, ports can be exposed
+
+# Entrypoint handles environment setup and runs Claude Code
+ENTRYPOINT ["entrypoint.sh"]
+
+# Default command - can be overridden at runtime
+# This runs Claude in print (non-interactive) mode with stream-json for programmatic interaction
+#
+# For interactive mode, override the CMD at runtime:
+#   podman run -it --rm ... claude-code:latest claude
+CMD ["claude", "--print", "--output-format", "stream-json", "--input-format", "stream-json"]

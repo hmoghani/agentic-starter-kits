@@ -1,0 +1,13 @@
+FROM ghcr.io/openclaw/openclaw:latest
+
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        iproute2 \
+    && rm -rf /var/lib/apt/lists/* && \
+    useradd -m -s /bin/bash -d /sandbox sandbox && \
+    groupadd -f sandbox && \
+    usermod -aG sandbox sandbox
+
+USER sandbox
+WORKDIR /sandbox

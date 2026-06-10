@@ -1093,3 +1093,33 @@ oc delete configmap claude-ogx-vllm-skills
 oc delete pvc claude-ogx-vllm-workspace
 oc delete project my-claude-project
 ```
+
+---
+
+## Running in an OpenShell Sandbox
+
+To run Claude Code inside an [OpenShell](https://github.com/NVIDIA/OpenShell-Community) sandbox, use the `Containerfile.openshell` instead of the standard `Containerfile`. This variant adds the `sandbox` user/group and system packages (`tar`, `iproute`) that OpenShell requires.
+
+### Build the OpenShell-compatible image
+
+```bash
+podman build --platform linux/amd64 -t claude-sandbox:latest -f Containerfile.openshell .
+```
+
+### Create a sandbox
+
+```bash
+openshell sandbox create --from claude-sandbox:latest -e ANTHROPIC_API_KEY=sk-...
+```
+
+### What `Containerfile.openshell` changes
+
+- Renames the container user from `claude-agent` to `sandbox` (required by OpenShell)
+- Adds `tar` and `iproute` packages (required by OpenShell's supervisor and network isolation)
+- All other functionality (Claude Code installation, entrypoint, skills mounting) remains the same
+
+### Notes
+
+- OpenShell's supervisor takes over as PID 1 and does not automatically run the image's entrypoint. The agent starts inside the sandbox shell.
+- Build with `--platform linux/amd64` when targeting x86_64 clusters from Apple Silicon machines.
+- Tested on OpenShell v0.0.58, OpenShift 4.21 (June 2026).
