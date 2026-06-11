@@ -17,13 +17,10 @@ openshell sandbox create --from codex-sandbox:latest -e OPENAI_API_KEY=sk-...
 
 ## What `Containerfile.openshell` does
 
-Builds from UBI 10 minimal (`registry.access.redhat.com/ubi10/ubi-minimal:10.1`) and installs:
+Builds on the shared base image (`quay.io/hmoghani/openshell-base`) which provides the `sandbox` user, system packages, and OpenShell entrypoint. This flavor adds:
 
 - Node.js and npm (from UBI repos)
 - Codex CLI via npm (version pinned, Apache 2.0)
-- `sandbox` user with GID=0 (required by OpenShell and OpenShift arbitrary-UID)
-- `iproute` and `tar` packages (required by OpenShell's supervisor and network isolation)
-- `/workspace` directory with group-writable permissions
 
 ## Notes
 

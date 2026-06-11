@@ -1098,7 +1098,7 @@ oc delete project my-claude-project
 
 ## Running in an OpenShell Sandbox
 
-To run Claude Code inside an [OpenShell](https://github.com/NVIDIA/OpenShell-Community) sandbox, use the `Containerfile.openshell` instead of the standard `Containerfile`. This variant adds the `sandbox` user/group and system packages (`tar`, `iproute`) that OpenShell requires.
+To run Claude Code inside an [OpenShell](https://github.com/NVIDIA/OpenShell-Community) sandbox, use the `Containerfile.openshell` instead of the standard `Containerfile`. This builds on the shared base image (`sandboxes/base/`) and adds Node.js and Claude Code on top.
 
 ### Build the OpenShell-compatible image
 
@@ -1127,11 +1127,12 @@ Or by passing the API key directly as an environment variable:
 openshell sandbox create --from claude-sandbox:latest -e ANTHROPIC_API_KEY=sk-...
 ```
 
-### What `Containerfile.openshell` changes
+### What `Containerfile.openshell` does
 
-- Uses `sandbox` user instead of `claude-agent` (required by OpenShell)
-- Adds `tar` and `iproute` packages (required by OpenShell's supervisor and network isolation)
-- All other functionality (Claude Code installation, entrypoint, skills mounting) remains the same
+Builds on the shared base image (`quay.io/hmoghani/openshell-base`) which provides the `sandbox` user, system packages, and OpenShell entrypoint. This flavor adds:
+
+- Node.js and npm (from UBI repos)
+- Claude Code via native installer (proprietary, version pinned)
 
 ### Notes
 

@@ -97,7 +97,7 @@ See [docs/raw-deployment.md](docs/raw-deployment.md) for the full walkthrough, c
 
 ## Running in an OpenShell Sandbox
 
-To run OpenClaw inside an [OpenShell](https://github.com/NVIDIA/OpenShell-Community) sandbox, use the `Containerfile.openshell`. This builds from UBI 10 minimal, installs OpenClaw via npm, and adds the `sandbox` user/group and system packages that OpenShell requires.
+To run OpenClaw inside an [OpenShell](https://github.com/NVIDIA/OpenShell-Community) sandbox, use the `Containerfile.openshell`. This builds on the shared base image (`sandboxes/base/`) and adds Node.js and the OpenClaw CLI on top.
 
 ### Build the OpenShell-compatible image
 
@@ -113,13 +113,10 @@ openshell sandbox create --from openclaw-sandbox:latest
 
 ### What `Containerfile.openshell` does
 
-Builds from UBI 10 minimal (`registry.access.redhat.com/ubi10/ubi-minimal:10.1`) and installs:
+Builds on the shared base image (`quay.io/hmoghani/openshell-base`) which provides the `sandbox` user, system packages, and OpenShell entrypoint. This flavor adds:
 
 - Node.js and npm (from UBI repos)
 - OpenClaw via npm (version pinned, MIT)
-- `sandbox` user with GID=0 (required by OpenShell and OpenShift arbitrary-UID)
-- `iproute` and `tar` packages (required by OpenShell's supervisor and network isolation)
-- `/workspace` directory with group-writable permissions
 
 ### Notes
 
