@@ -1,16 +1,16 @@
 # OGX Gateway for Claude Code
 
-Deploy OGX as an API gateway between Claude Code and vLLM on OpenShift. OGX provides the Anthropic Messages API (`/v1/messages`) by translating requests to OpenAI format and routing them to vLLM.
+Deploy OGX as an API gateway between Claude Code and vLLM on OpenShift. OGX provides the Anthropic Messages API (`/v1/messages`) passthrough to vLLM.
 
 ## Architecture
 
 ```text
 Claude Code  ──HTTP──▶  OGX (:8321)  ──HTTP──▶  vLLM (:8000)
-                        /v1/messages              /v1/chat/completions
-                        (Anthropic API)           (OpenAI API)
+                        /v1/messages              /v1/messages
+                        (passthrough)             (Anthropic API)
 ```
 
-OGX uses the `inline::builtin` messages provider to translate between Anthropic and OpenAI API formats. No code changes are needed on either side.
+When vLLM supports `/v1/messages` natively, OGX uses passthrough mode — requests are forwarded directly to vLLM without API format translation. If vLLM does not support `/v1/messages`, OGX falls back to translating Anthropic requests into OpenAI format via `/v1/chat/completions`.
 
 ## Prerequisites
 
@@ -117,7 +117,7 @@ providers:
     provider_type: inline::builtin   # Translates Anthropic ↔ OpenAI
 ```
 
-The `remote::vllm` provider connects to your vLLM backend. The `inline::builtin` messages provider handles the Anthropic-to-OpenAI translation.
+The `remote::vllm` provider connects to your vLLM backend. The `inline::builtin` messages provider enables the `/v1/messages` endpoint — when vLLM supports it natively, OGX uses passthrough mode (no translation).
 
 ### Models
 

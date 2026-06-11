@@ -3,8 +3,8 @@
 # This ConfigMap provides the OGX runtime configuration that enables
 # the Anthropic Messages API (/v1/messages) passthrough to a vLLM backend.
 #
-# OGX translates Anthropic Messages API requests into OpenAI-compatible
-# requests and routes them to the vLLM inference provider.
+# When vLLM supports /v1/messages natively, OGX uses passthrough mode —
+# requests are forwarded directly without API format translation.
 #
 # Before applying, replace the following placeholders with your values:
 #

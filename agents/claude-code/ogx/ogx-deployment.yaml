@@ -1,8 +1,8 @@
 # OGX Deployment for Claude Code Passthrough
 #
 # Deploys OGX as a standalone pod that provides the Anthropic Messages API
-# (/v1/messages) by translating requests to OpenAI format and routing them
-# to a vLLM backend.
+# (/v1/messages) passthrough to a vLLM backend. When vLLM supports
+# /v1/messages natively, OGX forwards requests directly without translation.
 #
 # This deployment does not use the LlamaStack operator. The configuration
 # is loaded from a ConfigMap mounted at /etc/ogx/config.yaml.
