@@ -15,7 +15,7 @@ When vLLM supports `/v1/messages` natively, OGX uses passthrough mode — reques
 ## Prerequisites
 
 - A vLLM server running and accessible within the cluster (see [`../vllm/`](../vllm/))
-- The vLLM model must have a context window >= 32K tokens (Claude Code's system prompt is ~23K tokens)
+- The vLLM model must have a context window >= 32K tokens (Claude Code's system prompt is ~23K tokens). For realistic coding work, 128K+ tokens is strongly recommended since CLAUDE.md, skills, file listings, and conversation easily push input past 100K tokens
 - `oc` CLI logged into the target OpenShift cluster
 
 ## Contents
