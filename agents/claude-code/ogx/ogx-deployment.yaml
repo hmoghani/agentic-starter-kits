@@ -27,6 +27,10 @@ spec:
       labels:
         app: ogx
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: ogx
         image: quay.io/rhoai/odh-ogx-core-rhel9:rhoai-3.5-ea.1
@@ -54,6 +58,8 @@ spec:
           capabilities:
             drop:
               - ALL
+          seccompProfile:
+            type: RuntimeDefault
         readinessProbe:
           httpGet:
             path: /v1/health

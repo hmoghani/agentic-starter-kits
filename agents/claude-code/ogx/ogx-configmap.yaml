@@ -41,7 +41,7 @@ data:
         provider_type: remote::vllm
         config:
           base_url: http://<VLLM_SERVICE>.<NAMESPACE>.svc.cluster.local:<VLLM_PORT>/v1
-          api_token: fake
+          api_token: fake        # vLLM default: no auth. Replace if vLLM is configured with --api-key
           max_tokens: 4096
 
       messages:
