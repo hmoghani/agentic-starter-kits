@@ -67,6 +67,60 @@ repos:
     hooks:
       - id: gitleaks
 
+  # uv-lock — keep lock files in sync with pyproject.toml
+  # One entry per independent project directory (uv-lock doesn't support
+  # pass_filenames). When adding a new agent, add an entry here.
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.11.21
+    hooks:
+      - id: uv-lock
+        name: uv-lock (root)
+        files: ^pyproject\.toml$
+      - id: uv-lock
+        name: uv-lock (a2a/langgraph_crewai_agent)
+        files: ^agents/a2a/templates/langgraph_crewai_agent/pyproject\.toml$
+        args: [--project, agents/a2a/templates/langgraph_crewai_agent]
+      - id: uv-lock
+        name: uv-lock (autogen/mcp_agent)
+        files: ^agents/autogen/templates/mcp_agent/pyproject\.toml$
+        args: [--project, agents/autogen/templates/mcp_agent]
+      - id: uv-lock
+        name: uv-lock (crewai/websearch_agent)
+        files: ^agents/crewai/templates/websearch_agent/pyproject\.toml$
+        args: [--project, agents/crewai/templates/websearch_agent]
+      - id: uv-lock
+        name: uv-lock (google/adk)
+        files: ^agents/google/templates/adk/pyproject\.toml$
+        args: [--project, agents/google/templates/adk]
+      - id: uv-lock
+        name: uv-lock (langgraph/agentic_rag)
+        files: ^agents/langgraph/templates/agentic_rag/pyproject\.toml$
+        args: [--project, agents/langgraph/templates/agentic_rag]
+      - id: uv-lock
+        name: uv-lock (langgraph/human_in_the_loop)
+        files: ^agents/langgraph/templates/human_in_the_loop/pyproject\.toml$
+        args: [--project, agents/langgraph/templates/human_in_the_loop]
+      - id: uv-lock
+        name: uv-lock (langgraph/react_agent)
+        files: ^agents/langgraph/templates/react_agent/pyproject\.toml$
+        args: [--project, agents/langgraph/templates/react_agent]
+      - id: uv-lock
+        name: uv-lock (langgraph/react_with_database_memory)
+        files: ^agents/langgraph/templates/react_with_database_memory/pyproject\.toml$
+        args: [--project, agents/langgraph/templates/react_with_database_memory]
+      - id: uv-lock
+        name: uv-lock (llamaindex/websearch_agent)
+        files: ^agents/llamaindex/templates/websearch_agent/pyproject\.toml$
+        args: [--project, agents/llamaindex/templates/websearch_agent]
+      - id: uv-lock
+        name: uv-lock (vanilla_python/openai_responses_agent)
+        files: ^agents/vanilla_python/templates/openai_responses_agent/pyproject\.toml$
+        args: [--project, agents/vanilla_python/templates/openai_responses_agent]
+      - id: uv-lock
+        name: uv-lock (components/auth)
+        files: ^components/auth/pyproject\.toml$
+        args: [--project, components/auth]
+
   # Actionlint — GitHub Actions workflow validation
   # Keep version in sync with raven-actions/actionlint in .github/workflows/code-quality.yml
   - repo: https://github.com/rhysd/actionlint

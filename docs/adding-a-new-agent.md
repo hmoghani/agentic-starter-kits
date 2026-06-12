@@ -41,6 +41,7 @@ Every agent must have:
 | `Makefile` | Consistent interface: init, run, build, build-openshift, deploy, dry-run, test |
 | `Dockerfile` | Container build (UBI9 Python 3.12, non-root user, port 8080) |
 | `pyproject.toml` | Python dependencies |
+| `uv.lock` | Lock file for reproducible builds (run `uv lock` to generate) |
 | `main.py` | FastAPI app with /chat/completions, /health endpoints |
 | `README.md` | Setup, usage, and deployment instructions |
 | `src/<agent_name>/` | Agent source code (agent.py, tools.py) |
@@ -120,6 +121,19 @@ make build && make push && make deploy  # OpenShift test (via registry)
 make build-openshift && make deploy    # OpenShift test (in-cluster build)
 ```
 
-## 10. Update Root README
+## 10. Register the Lock File Hook
+
+Add a `uv-lock` entry for your agent in `.pre-commit-config.yaml` under the `astral-sh/uv-pre-commit` repo:
+
+```yaml
+      - id: uv-lock
+        name: uv-lock (<framework>/<your_agent>)
+        files: ^agents/<framework>/templates/<your_agent>/pyproject\.toml$
+        args: [--project, agents/<framework>/templates/<your_agent>]
+```
+
+This ensures the lock file is auto-updated whenever `pyproject.toml` changes. See [CONTRIBUTING.md](../CONTRIBUTING.md#dependency-management) for details.
+
+## 11. Update Root README
 
 Add your agent to the agent table in the root `README.md`.
