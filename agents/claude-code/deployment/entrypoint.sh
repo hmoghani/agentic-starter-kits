@@ -26,8 +26,25 @@
 #     MCP_CONFIG_FILE          - Path to MCP configuration JSON file
 #     MCP_CONFIG_JSON          - MCP configuration as inline JSON string
 #
+#   Git Credentials:
+#     GITHUB_PAT               - GitHub Personal Access Token for push access
+#     GIT_USER_NAME            - Git commit author name (default: claude-agent)
+#     GIT_USER_EMAIL           - Git commit author email (default: claude-agent@noreply.github.com)
+#
+#   MLflow Tracing (optional):
+#     MLFLOW_TRACKING_URI      - MLflow server URI (enables tracing when set)
+#     MLFLOW_EXPERIMENT_NAME   - Experiment name (default: claude-code-traces)
+#     MLFLOW_TRACKING_AUTH     - Auth plugin name (default: kubernetes-namespaced)
+#     MLFLOW_WORKSPACE         - MLflow workspace (typically the namespace)
+#     MLFLOW_TRACKING_INSECURE_TLS - Set to "true" to skip TLS cert verification
+#
 #   Permissions:
 #     SKIP_PERMISSIONS         - Set to "true" to bypass permission checks (sandboxed environments only)
+#
+#   Session Persistence:
+#     CLAUDE_CONFIG_DIR        - Directory for Claude Code state (default: /workspace/.claude)
+#                                Session history and memory persist here across pod restarts.
+#                                A symlink is created from ~/.claude to this directory.
 #
 # =============================================================================
 
@@ -57,6 +74,25 @@ log_warn() {
 
 log_error() {
     echo "[entrypoint] ERROR: $*" >&2
+}
+
+# -----------------------------------------------------------------------------
+# Onboarding
+# -----------------------------------------------------------------------------
+
+setup_onboarding() {
+    local claude_json="${HOME}/.claude.json"
+    log_info "Marking onboarding as complete (skips interactive login wizard)"
+    if [[ -f "${claude_json}" ]]; then
+        local merged
+        merged=$(jq '.hasCompletedOnboarding = true' "${claude_json}" 2>/dev/null) \
+            && echo "${merged}" > "${claude_json}" \
+            && return
+        # jq failed (malformed JSON or permissions), fall through to overwrite
+        rm -f "${claude_json}" 2>/dev/null || true
+    fi
+    echo '{"hasCompletedOnboarding": true}' > "${claude_json}"
+    chmod 660 "${claude_json}"
 }
 
 # -----------------------------------------------------------------------------
@@ -96,6 +132,63 @@ validate_environment() {
 }
 
 # -----------------------------------------------------------------------------
+# Git Credentials
+# -----------------------------------------------------------------------------
+
+setup_git_credentials() {
+    if [[ -n "${GITHUB_PAT:-}" ]]; then
+        log_info "Configuring git credentials for github.com"
+        git config --global credential.helper store
+        local cred_file="${HOME}/.git-credentials"
+        echo "https://x-access-token:${GITHUB_PAT}@github.com" > "${cred_file}"
+        chmod 600 "${cred_file}"
+        git config --global user.name "${GIT_USER_NAME:-claude-agent}"
+        git config --global user.email "${GIT_USER_EMAIL:-claude-agent@noreply.github.com}"
+    fi
+}
+
+# -----------------------------------------------------------------------------
+# Config Directory Setup (Session Persistence)
+# -----------------------------------------------------------------------------
+
+setup_config_dir() {
+    # Use CLAUDE_CONFIG_DIR for Claude Code state, defaulting to /workspace/.claude
+    # This enables session persistence since /workspace is backed by a PVC
+    export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-/workspace/.claude}"
+
+    # Ensure the config directory exists
+    mkdir -p "${CLAUDE_CONFIG_DIR}"
+
+    # Ensure the projects directory exists (WORKDIR is /workspace/projects)
+    # This separates global config (/workspace/.claude) from local auto-memory (/workspace/projects/.claude)
+    mkdir -p /workspace/projects
+
+    # Create symlink from ~/.claude to the config dir for user convenience
+    # Users expect to find settings/skills at ~/.claude/
+    # The image doesn't include ~/.claude (removed at build time), so we just create the symlink
+    local home_claude_dir="${HOME}/.claude"
+    if [[ -L "${home_claude_dir}" ]]; then
+        # Symlink exists - verify it points to the correct location
+        local current_target
+        current_target=$(readlink "${home_claude_dir}")
+        if [[ "${current_target}" != "${CLAUDE_CONFIG_DIR}" ]]; then
+            ln -sfn "${CLAUDE_CONFIG_DIR}" "${home_claude_dir}"
+            log_info "Updated symlink: ${home_claude_dir} -> ${CLAUDE_CONFIG_DIR}"
+        fi
+    else
+        # No symlink - remove any existing directory and create the symlink
+        if [[ -d "${home_claude_dir}" ]]; then
+            log_info "Removing existing ${home_claude_dir} directory"
+            rm -rf "${home_claude_dir}" 2>/dev/null || mv -f "${home_claude_dir}" "${home_claude_dir}.old" 2>/dev/null || true
+        fi
+        ln -sfn "${CLAUDE_CONFIG_DIR}" "${home_claude_dir}"
+    fi
+
+    log_info "Claude config directory: ${CLAUDE_CONFIG_DIR}"
+    log_info "Symlink: ${home_claude_dir} -> ${CLAUDE_CONFIG_DIR}"
+}
+
+# -----------------------------------------------------------------------------
 # MCP Configuration
 # -----------------------------------------------------------------------------
 
@@ -128,13 +221,71 @@ setup_mcp() {
 }
 
 # -----------------------------------------------------------------------------
+# MLflow Tracing
+# -----------------------------------------------------------------------------
+
+setup_mlflow() {
+    if [[ -z "${MLFLOW_TRACKING_URI:-}" ]]; then
+        return
+    fi
+
+    if ! command -v mlflow >/dev/null 2>&1; then
+        log_warn "MLFLOW_TRACKING_URI is set but mlflow is not installed"
+        return
+    fi
+
+    log_info "Configuring MLflow tracing"
+
+    export MLFLOW_TRACKING_AUTH="${MLFLOW_TRACKING_AUTH:-kubernetes-namespaced}"
+    export MLFLOW_TRACKING_INSECURE_TLS="${MLFLOW_TRACKING_INSECURE_TLS:-false}"
+
+    if [[ "${MLFLOW_TRACKING_INSECURE_TLS}" == "true" ]]; then
+        log_warn "MLflow TLS certificate verification is disabled (MLFLOW_TRACKING_INSECURE_TLS=true)"
+    fi
+
+    if ! mlflow autolog claude \
+        -d /workspace \
+        -u "${MLFLOW_TRACKING_URI}" \
+        -n "${MLFLOW_EXPERIMENT_NAME:-claude-code-traces}"; then
+        log_warn "mlflow autolog failed. Tracing will not be available, but Claude Code will still work."
+        return
+    fi
+
+    # Inject MLflow auth env vars into the generated settings
+    if ! python3 -c '
+import json, os, sys
+config_dir = os.environ.get("CLAUDE_CONFIG_DIR", "/workspace/.claude")
+sf = os.path.join(config_dir, "settings.json")
+if not os.path.exists(sf):
+    print(f"[entrypoint] WARN: {sf} not found, skipping MLflow settings injection")
+    sys.exit(0)
+try:
+    with open(sf) as f:
+        s = json.load(f)
+except json.JSONDecodeError:
+    print(f"[entrypoint] WARN: {sf} contains invalid JSON, skipping MLflow settings injection")
+    sys.exit(0)
+env = s.setdefault("env", {})
+env["MLFLOW_TRACKING_AUTH"] = os.environ.get("MLFLOW_TRACKING_AUTH", "kubernetes-namespaced")
+env["MLFLOW_WORKSPACE"] = os.environ.get("MLFLOW_WORKSPACE", "")
+env["MLFLOW_TRACKING_INSECURE_TLS"] = os.environ.get("MLFLOW_TRACKING_INSECURE_TLS", "false")
+with open(sf, "w") as f:
+    json.dump(s, f, indent=2)
+print("[entrypoint] INFO: MLflow settings injected into " + sf)
+'; then
+        log_warn "MLflow settings injection failed. Tracing may not authenticate correctly."
+    fi
+}
+
+# -----------------------------------------------------------------------------
 # Skills Configuration
 # -----------------------------------------------------------------------------
 
 setup_skills() {
-    # Claude Code auto-discovers skills from ~/.claude/skills/
-    # Structure: ~/.claude/skills/<skill-name>/SKILL.md
-    local skills_dir="${HOME}/.claude/skills"
+    # Claude Code auto-discovers skills from $CLAUDE_CONFIG_DIR/skills/
+    # Structure: $CLAUDE_CONFIG_DIR/skills/<skill-name>/SKILL.md
+    # (Also accessible via ~/.claude/skills/ symlink)
+    local skills_dir="${CLAUDE_CONFIG_DIR}/skills"
 
     if [[ -d "${skills_dir}" ]]; then
         local skill_count
@@ -223,8 +374,12 @@ main() {
     log_info "Claude Code version: $(claude --version 2>/dev/null || echo 'unknown')"
 
     # Run setup functions
+    setup_onboarding
     validate_environment
+    setup_git_credentials
+    setup_config_dir
     setup_mcp
+    setup_mlflow
     setup_skills
     build_claude_args
 

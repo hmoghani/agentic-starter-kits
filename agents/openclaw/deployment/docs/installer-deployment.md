@@ -121,7 +121,7 @@ Now using project "<your-name>-openclaw" on server "https://api.<your-cluster>:4
 
 ```bash
 git clone https://github.com/sallyom/claw-installer.git
-cd openclaw-installer
+cd claw-installer
 npm install && npm run build && npm run dev
 ```
 
@@ -203,7 +203,13 @@ Expected output:
 
 ### Step 6: Approve device pairing
 
-After SSO login, the Control UI requires a one-time device pairing. Get the request ID from the UI prompt, then:
+After SSO login, the Control UI requires a one-time device pairing. To find the pending request ID, list devices inside the pod:
+
+```bash
+oc exec deployment/openclaw -n <namespace> -c gateway -- openclaw devices list
+```
+
+Look for the **Pending** section in the output — the request ID is in the first column. Then approve it:
 
 ```bash
 oc exec deployment/openclaw -n <namespace> -c gateway -- \
