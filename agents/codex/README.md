@@ -160,22 +160,13 @@ The deployment manifest contains all required resources: ImageStream, BuildConfi
 # Apply all resources (ImageStream, BuildConfig, ConfigMaps, PVC, Deployment)
 oc apply -f deployment.yaml
 
-# Option A: Build on the cluster (requires internet for docker.io/rust:1-bookworm)
+# Build locally and push to the internal registry (recommended)
 #
-# Create a BuildConfig for the base image
-oc new-build --strategy=docker --binary --name=codex-base
-oc start-build codex-base --from-dir=. --follow
-#
-# Then build the RHOAI flavor
-oc start-build codex --from-dir=. --follow
-
-# Option B: Build locally and push (recommended — avoids Docker Hub rate limits)
-#
-# Build locally (see Step 1), then push to the internal registry:
-REGISTRY=$(oc get route -n openshift-image-registry image-registry -o jsonpath='{.spec.host}')
-podman login "${REGISTRY}" -u $(oc whoami) -p $(oc whoami -t) --tls-verify=false
-podman tag codex:latest "${REGISTRY}/$(oc project -q)/codex:latest"
-podman push "${REGISTRY}/$(oc project -q)/codex:latest" --tls-verify=false
+# Build locally (see Step 1), then push:
+oc registry login
+podman tag codex:latest \
+  $(oc registry info)/$(oc project -q)/codex:latest
+podman push $(oc registry info)/$(oc project -q)/codex:latest
 #
 # Import into the ImageStream
 oc tag --source=docker \
@@ -305,9 +296,9 @@ After modifying the Containerfile or entrypoint, rebuild locally and push:
 podman build --platform linux/amd64 -t codex:latest -f Containerfile \
   --build-arg BASE_IMAGE=codex-base:latest .
 
-REGISTRY=$(oc get route -n openshift-image-registry image-registry -o jsonpath='{.spec.host}')
-podman tag codex:latest "${REGISTRY}/$(oc project -q)/codex:latest"
-podman push "${REGISTRY}/$(oc project -q)/codex:latest" --tls-verify=false
+oc registry login
+podman tag codex:latest $(oc registry info)/$(oc project -q)/codex:latest
+podman push $(oc registry info)/$(oc project -q)/codex:latest
 
 oc import-image codex:latest --confirm
 oc rollout restart deployment/codex
