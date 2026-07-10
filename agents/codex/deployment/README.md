@@ -1,29 +1,49 @@
-# Codex — OpenShell Sandbox Deployment
+# Codex Deployment Files
 
-This directory contains an OpenShell-compatible Containerfile for running [OpenAI Codex CLI](https://github.com/openai/codex) inside an OpenShell sandbox.
+This directory contains Containerfiles, entrypoint, and deployment manifests for running [OpenAI Codex CLI](https://github.com/openai/codex) on OpenShift.
 
-## Prerequisites
+For the full deployment guide, see the [Codex on OpenShift README](../README.md).
 
-- [Podman](https://podman.io/) or Docker installed
-- [OpenShell CLI](https://github.com/NVIDIA/OpenShell-Community) installed
-- An OpenShell gateway running
+## Files
 
-## Build and Run
+| File | Description |
+|------|-------------|
+| `Containerfile.base` | Base image build (multi-stage: compiles Codex from source, UBI 9 minimal runtime) |
+| `Containerfile` | RHOAI flavor (extends base with entrypoint, MCP injection, session persistence) |
+| `Containerfile.openshell` | OpenShell sandbox variant (extends openshell-base) |
+| `entrypoint.sh` | Container entrypoint (auth, model provider, MCP, git credential setup) |
+| `deployment.yaml` | OpenShift manifests (ImageStream, BuildConfig, ConfigMaps, PVC, Deployment) |
+
+## Quick Reference
+
+| Setting | Environment Variable | Default |
+|---------|---------------------|---------|
+| API key | `OPENAI_API_KEY` | (required) |
+| Inference endpoint | `OPENAI_BASE_URL` | (required for vLLM) |
+| Model | `OPENAI_MODEL` | (provider default) |
+| Config directory | `CODEX_HOME` | `/workspace/.codex` |
+| Sandbox mode | `CODEX_SANDBOX` | `danger-full-access` |
+| MCP config (TOML file) | `MCP_CONFIG_TOML` | (none) |
+| MCP config (inline JSON) | `MCP_CONFIG_JSON` | (none) |
+| GitHub PAT | `GITHUB_PAT` | (none) |
+
+## Build Order
 
 ```bash
-podman build --platform linux/amd64 -t codex-sandbox:latest -f Containerfile.openshell .
-openshell sandbox create --from codex-sandbox:latest -e OPENAI_API_KEY=sk-...
+# 1. Build base image
+podman build --platform linux/amd64 -t codex-base:latest -f Containerfile.base .
+
+# 2. Build RHOAI flavor
+podman build --platform linux/amd64 -t codex:latest -f Containerfile \
+  --build-arg BASE_IMAGE=codex-base:latest .
 ```
 
-## What `Containerfile.openshell` does
+## Comparison: RHOAI vs OpenShell
 
-Builds on the shared base image (`quay.io/hmoghani/openshell-base`) which provides the `sandbox` user, system packages, and OpenShell entrypoint. This flavor adds:
-
-- Node.js and npm (from UBI repos)
-- Codex CLI via npm (version pinned, Apache 2.0)
-
-## Notes
-
-- OpenShell's supervisor takes over as PID 1 and does not automatically run the Codex CLI. Start it manually inside the sandbox.
-- Build with `--platform linux/amd64` when targeting x86_64 clusters from Apple Silicon machines.
-- Tested on OpenShell v0.0.58, OpenShift 4.21 (June 2026). Codex CLI version 0.139.0.
+| | RHOAI (Containerfile) | OpenShell (Containerfile.openshell) |
+|--|----------------------|-------------------------------------|
+| **Base** | UBI 9 minimal (multi-stage) | openshell-base |
+| **Codex install** | Compiled from source (Rust) | npm install in image |
+| **Runtime** | Standalone pod, `oc exec` | OpenShell gateway sandbox |
+| **Auth** | Env vars, entrypoint setup | Manual inside sandbox |
+| **Use case** | Production RHOAI deployment | Sandboxed experimentation |

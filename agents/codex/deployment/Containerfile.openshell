@@ -16,7 +16,7 @@ RUN microdnf install -y --nodocs nodejs npm && \
     rm -rf /var/cache/yum
 
 # Install Codex CLI (Apache 2.0)
-ARG CODEX_VERSION=0.139.0
+ARG CODEX_VERSION=0.144.0
 RUN npm install -g @openai/codex@${CODEX_VERSION}
 
 # Verify

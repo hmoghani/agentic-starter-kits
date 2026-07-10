@@ -1,0 +1,45 @@
+# Codex CLI — RHOAI Flavor
+#
+# Extends the Codex base image with RHOAI-specific configuration:
+# - Entrypoint with env-var-driven setup (auth, model provider, MCP, git)
+# - codex-run wrapper for oc exec convenience
+# - Session persistence via PVC-backed CODEX_HOME
+#
+# Build the base image first, then this flavor:
+#   podman build --platform linux/amd64 -t codex-base:latest -f Containerfile.base .
+#   podman build --platform linux/amd64 -t codex:latest -f Containerfile \
+#     --build-arg BASE_IMAGE=codex-base:latest .
+#
+# Features:
+# - Configurable inference endpoint (vLLM, OpenAI, OpenRouter)
+# - MCP server configuration injectable at runtime via environment variables:
+#     MCP_CONFIG_TOML - path to a TOML file with [mcp_servers.*] tables
+#     MCP_CONFIG_JSON - inline JSON string with MCP server definitions
+# - Git credential injection via GITHUB_PAT
+# - Non-root user compatible with restricted-v2 SCC
+
+ARG BASE_IMAGE=quay.io/hmoghani/codex-base:latest
+FROM ${BASE_IMAGE}
+
+LABEL name="codex" \
+      vendor="Red Hat" \
+      summary="Codex CLI agent for OpenShift AI" \
+      description="RHOAI-flavored Codex CLI with entrypoint, MCP injection, and session persistence" \
+      license="Apache-2.0"
+
+USER 0
+
+# Remove ~/.codex created during base build — entrypoint will create a symlink
+# to /workspace/.codex for PVC-backed persistence
+RUN rm -rf /home/codex-agent/.codex
+
+COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
+
+USER 1001
+WORKDIR /workspace/projects
+
+ENTRYPOINT ["entrypoint.sh"]
+
+# Default: non-interactive exec mode
+# Override at runtime for interactive use or sleep infinity for oc exec
+CMD ["codex", "exec", "echo hello"]
