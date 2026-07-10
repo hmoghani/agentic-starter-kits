@@ -54,7 +54,34 @@ Codex uses a two-stage image build: a **base image** containing the Codex Rust b
 
 ### Build the base image
 
-The base image uses a multi-stage Dockerfile. The builder stage compiles Codex from the upstream Apache 2.0 source using the official Rust toolchain, producing an auditable binary with no opaque pre-built artifacts. Only the compiled binary is copied into the clean UBI 9 minimal runtime. The runtime stage installs Node.js 16 and npm from UBI repos for npx-based MCP servers.
+The base image uses a multi-stage Dockerfile. The builder stage compiles Codex and bubblewrap (`bwrap`) from the upstream Apache 2.0 source using the official Rust toolchain, producing auditable binaries with no opaque pre-built artifacts. Only the compiled binaries are copied into the clean UBI 9 minimal runtime. The runtime stage installs Node.js 16 and npm from UBI repos for npx-based MCP servers.
+
+#### Build requirements
+
+| Resource | Minimum | Notes |
+|----------|---------|-------|
+| RAM | 32 GB | Podman VM must be configured with `podman machine set --memory 32768`. The Rust linker requires this during the final linking step of the 130+ crate workspace. |
+| Disk | 50 GB | The builder stage downloads ~1.5 GB of Rust crate sources and produces ~20 GB of intermediate compilation artifacts. These are cleaned up before the layer is committed, but the space is needed during the build. |
+| Time | ~12 min | Cross-compiling from ARM64 to x86_64. Native x86_64 builds are faster. |
+| Network | Required | The builder clones the Codex source from GitHub and downloads the Rust toolchain + crate registry. Not needed once the image is built. |
+
+On Apple Silicon Macs, the builder uses cross-compilation (not QEMU emulation) to produce an x86_64 binary. This avoids the SIGSEGV crashes that occur when running `rustc` under QEMU, but requires more RAM than a native build. The upstream release profile's thin LTO is disabled during cross-compilation to stay within memory limits — the binary is functionally identical, just slightly larger.
+
+Native x86_64 builds (e.g., on the cluster via `oc start-build` or in CI) do not have the 32 GB RAM constraint and can use the default podman/Docker settings.
+
+#### Podman machine setup (macOS only)
+
+```bash
+# First time
+podman machine init --memory 32768 --disk-size 100
+
+# Or update an existing machine
+podman machine stop
+podman machine set --memory 32768
+podman machine start
+```
+
+#### Build commands
 
 ```bash
 podman build --platform linux/amd64 \
@@ -69,6 +96,8 @@ podman build --platform linux/amd64 \
 ```
 
 ### Build the RHOAI flavor image
+
+The flavor image extends the base with the RHOAI entrypoint. This is a fast build (~5 seconds) since it only adds shell scripts.
 
 ```bash
 podman build --platform linux/amd64 \
@@ -94,14 +123,10 @@ Available tags are listed at [github.com/openai/codex/releases](https://github.c
 
 | Image | Approximate Size | Contents |
 |-------|-----------------|----------|
-| `codex-base` | ~579 MB | UBI 9 minimal + Codex Rust binary (compiled from source) + git, jq, tar, nodejs, npm |
+| `codex-base` | ~579 MB | UBI 9 minimal + Codex + bwrap (compiled from source) + git, jq, tar, nodejs, npm |
 | `codex` (flavor) | ~579 MB | Base + entrypoint.sh, codex-run wrapper |
 
-The flavor image adds only shell scripts, so its size is effectively the same as the base. The base image build takes ~12 minutes because it cross-compiles Codex from Rust source. Cross-compiling on Apple Silicon requires 32GB+ RAM allocated to the podman VM (`podman machine set --memory 32768`). Native x86_64 builds (e.g., on the cluster via `oc start-build`) do not have this constraint.
-
-### Build with `--platform linux/amd64`
-
-Always pass `--platform linux/amd64` when building on Apple Silicon. The builder stage cross-compiles the Codex Rust binary for `x86_64-unknown-linux-gnu`, which is the architecture used by OpenShift nodes.
+The flavor image adds only shell scripts, so its size is effectively the same as the base.
 
 ---
 
