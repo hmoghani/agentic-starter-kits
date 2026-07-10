@@ -203,9 +203,13 @@ setup_mcp() {
     # Method 1: TOML file path (preferred — native Codex format)
     if [[ -n "${MCP_CONFIG_TOML:-}" ]]; then
         if [[ -f "${MCP_CONFIG_TOML}" ]]; then
-            log_info "Appending MCP config from: ${MCP_CONFIG_TOML}"
-            echo "" >> "${config_file}"
-            cat "${MCP_CONFIG_TOML}" >> "${config_file}"
+            while IFS= read -r server_name; do
+                if ! grep -q "^\[mcp_servers\.${server_name}\]" "${config_file}" 2>/dev/null; then
+                    log_info "Adding MCP server from MCP_CONFIG_TOML: ${server_name}"
+                    sed -n "/^\[mcp_servers\.${server_name}\]/,/^\[/{ /^\[mcp_servers\.${server_name}\]/p; /^\[mcp_servers\./!{ /^\[/!p; }; }" "${MCP_CONFIG_TOML}" >> "${config_file}"
+                    echo "" >> "${config_file}"
+                fi
+            done < <(grep -oP '^\[mcp_servers\.\K[^\]]+' "${MCP_CONFIG_TOML}" 2>/dev/null)
         else
             log_error "MCP_CONFIG_TOML file not found: ${MCP_CONFIG_TOML}"
         fi
@@ -215,34 +219,44 @@ setup_mcp() {
     # the Claude Code MCP_CONFIG_JSON pattern)
     if [[ -n "${MCP_CONFIG_JSON:-}" ]]; then
         log_info "Converting MCP JSON config to TOML"
-        local toml_block
-        toml_block=$(echo "${MCP_CONFIG_JSON}" | jq -r '
-            .mcpServers // {} | to_entries[] |
-            "\n[mcp_servers.\(.key)]",
-            (if .value.url then "url = \"\(.value.url)\"" else empty end),
-            (if .value.command then "command = \"\(.value.command)\"" else empty end),
-            (if .value.args then "args = [\(.value.args | map("\"" + . + "\"") | join(", "))]" else empty end),
-            ""
-        ' 2>/dev/null) || {
-            log_warn "Failed to convert MCP JSON to TOML. Check MCP_CONFIG_JSON format."
+        local server_names
+        server_names=$(echo "${MCP_CONFIG_JSON}" | jq -r '.mcpServers // {} | keys[]' 2>/dev/null) || {
+            log_warn "Failed to parse MCP_CONFIG_JSON. Check format."
             return
         }
 
-        if [[ -n "${toml_block}" ]]; then
-            echo "${toml_block}" >> "${config_file}"
-            log_info "Appended MCP config from MCP_CONFIG_JSON"
-        fi
+        for server_name in ${server_names}; do
+            if grep -q "^\[mcp_servers\.${server_name}\]" "${config_file}" 2>/dev/null; then
+                log_info "MCP server '${server_name}' already in config.toml, skipping"
+                continue
+            fi
+            local server_toml
+            server_toml=$(echo "${MCP_CONFIG_JSON}" | jq -r --arg name "$server_name" '
+                .mcpServers[$name] |
+                "\n[mcp_servers.\($name)]",
+                (if .url then "url = \"\(.url)\"" else empty end),
+                (if .command then "command = \"\(.command)\"" else empty end),
+                (if .args then "args = [\(.args | map("\"" + . + "\"") | join(", "))]" else empty end),
+                ""
+            ' 2>/dev/null)
+            if [[ -n "${server_toml}" ]]; then
+                echo "${server_toml}" >> "${config_file}"
+                log_info "Added MCP server from MCP_CONFIG_JSON: ${server_name}"
+            fi
+        done
     fi
 
     # Method 3: Mounted ConfigMap (TOML file at well-known path)
     local mounted_mcp="/etc/codex-mcp/mcp-servers.toml"
     if [[ -f "${mounted_mcp}" ]]; then
-        # Only append if the file has actual content (not just comments)
-        if grep -qE '^\[mcp_servers\.' "${mounted_mcp}" 2>/dev/null; then
-            log_info "Loading MCP config from: ${mounted_mcp}"
-            echo "" >> "${config_file}"
-            cat "${mounted_mcp}" >> "${config_file}"
-        fi
+        # Only append servers that aren't already in config.toml
+        while IFS= read -r server_name; do
+            if ! grep -q "^\[mcp_servers\.${server_name}\]" "${config_file}" 2>/dev/null; then
+                log_info "Adding MCP server from ConfigMap: ${server_name}"
+                sed -n "/^\[mcp_servers\.${server_name}\]/,/^\[/{ /^\[mcp_servers\.${server_name}\]/p; /^\[mcp_servers\./!{ /^\[/!p; }; }" "${mounted_mcp}" >> "${config_file}"
+                echo "" >> "${config_file}"
+            fi
+        done < <(grep -oP '^\[mcp_servers\.\K[^\]]+' "${mounted_mcp}" 2>/dev/null)
     fi
 }
 
@@ -252,20 +266,22 @@ setup_mcp() {
 
 build_codex_args() {
     local args=()
+    local exec_args=()
 
-    # Model selection
+    # Model selection (global — works with all subcommands)
     if [[ -n "${OPENAI_MODEL:-}" ]]; then
         args+=("--model" "${OPENAI_MODEL}")
     fi
 
-    # Sandbox mode — container itself is the isolation boundary
+    # Sandbox mode — container itself is the isolation boundary (global)
     local sandbox="${CODEX_SANDBOX:-danger-full-access}"
     args+=("--sandbox" "${sandbox}")
 
-    # Skip git repo check — workspace may not be a git repo initially
-    args+=("--skip-git-repo-check")
+    # Skip git repo check — only valid for `codex exec`, not interactive mode
+    exec_args+=("--skip-git-repo-check")
 
     export CODEX_EXTRA_ARGS="${args[*]:-}"
+    export CODEX_EXEC_ARGS="${exec_args[*]:-}"
 
     # Persist args for oc exec sessions
     local codex_dir="${HOME}/.codex"
@@ -275,6 +291,7 @@ build_codex_args() {
 # Generated by entrypoint.sh — source this in oc exec sessions
 export CODEX_HOME="${CODEX_HOME}"
 export CODEX_EXTRA_ARGS="${args[*]:-}"
+export CODEX_EXEC_ARGS="${exec_args[*]:-}"
 $([ -n "${OPENAI_API_KEY:-}" ] && echo "export OPENAI_API_KEY=\"${OPENAI_API_KEY}\"")
 $([ -n "${CODEX_API_KEY:-}" ] && echo "export CODEX_API_KEY=\"${CODEX_API_KEY}\"")
 $([ -n "${OPENAI_BASE_URL:-}" ] && echo "export OPENAI_BASE_URL=\"${OPENAI_BASE_URL}\"")
@@ -289,7 +306,12 @@ EOF
 #   codex-run exec "fix the bug in main.py"
 #   codex-run    (interactive mode)
 source "${HOME}/.codex/env.sh" 2>/dev/null || true
-exec codex ${CODEX_EXTRA_ARGS} "$@"
+# Add exec-only args when the subcommand is "exec"
+if [[ "${1:-}" == "exec" ]]; then
+    exec codex ${CODEX_EXTRA_ARGS} "$1" ${CODEX_EXEC_ARGS} "${@:2}"
+else
+    exec codex ${CODEX_EXTRA_ARGS} "$@"
+fi
 WRAPPER
     chmod +x "${codex_dir}/codex-run"
 
@@ -332,8 +354,13 @@ main() {
 
     if [[ "$1" == "codex" ]]; then
         shift
-        log_info "Running: codex ${CODEX_EXTRA_ARGS} $*"
-        exec codex ${CODEX_EXTRA_ARGS} "$@"
+        if [[ "${1:-}" == "exec" ]]; then
+            log_info "Running: codex ${CODEX_EXTRA_ARGS} exec ${CODEX_EXEC_ARGS} ${*:2}"
+            exec codex ${CODEX_EXTRA_ARGS} "$1" ${CODEX_EXEC_ARGS} "${@:2}"
+        else
+            log_info "Running: codex ${CODEX_EXTRA_ARGS} $*"
+            exec codex ${CODEX_EXTRA_ARGS} "$@"
+        fi
     fi
 
     log_info "Running: $*"
