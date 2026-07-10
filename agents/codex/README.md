@@ -622,6 +622,7 @@ oc logs deployment/codex --previous
 ```
 
 Common causes:
+
 - `CODEX_HOME` directory not writable (PVC not mounted or permissions issue)
 - Invalid TOML in ConfigMap (syntax error in config.toml or mcp-servers.toml)
 - Missing base image (flavor Containerfile references a base image that has not been built)
