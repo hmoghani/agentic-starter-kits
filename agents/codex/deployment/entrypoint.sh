@@ -169,12 +169,6 @@ setup_model_provider() {
         return
     fi
 
-    # Skip if provider config already exists (e.g., from staged ConfigMap)
-    if grep -q 'model_provider' "${config_file}" 2>/dev/null; then
-        log_info "Provider config already exists in config.toml, skipping"
-        return
-    fi
-
     if [[ -z "${OPENAI_MODEL:-}" ]]; then
         log_error "OPENAI_BASE_URL is set but OPENAI_MODEL is not. Set OPENAI_MODEL to the model name served by vLLM (check GET /v1/models)."
         return
@@ -182,12 +176,12 @@ setup_model_provider() {
 
     local model="${OPENAI_MODEL}"
 
-    # Set model if not already present (avoids duplicate keys)
-    if ! grep -q '^model\s*=' "${config_file}" 2>/dev/null; then
-        echo "model = \"${model}\"" >> "${config_file}"
-    fi
+    # Remove any existing model/provider lines so env vars always win
+    sed -i '/^model\s*=/d; /^model_provider\s*=/d' "${config_file}" 2>/dev/null || true
+    sed -i '/^\[model_providers\./,/^$/d' "${config_file}" 2>/dev/null || true
 
     cat >> "${config_file}" <<EOF
+model = "${model}"
 
 # Auto-configured by entrypoint.sh
 model_provider = "vllm"

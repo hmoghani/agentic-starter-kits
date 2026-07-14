@@ -5,7 +5,8 @@
 #
 # Prerequisites:
 #   - oc CLI logged into an OpenShift cluster
-#   - A vLLM endpoint serving /v1/responses (vLLM v0.10.0+)
+#   - A vLLM endpoint serving /v1/responses with tool calling enabled
+#     (vLLM v0.25.x+ required — RHOAI EA v0.19.1 does not support Codex)
 #
 # Usage:
 #   oc new-project <your-namespace>
