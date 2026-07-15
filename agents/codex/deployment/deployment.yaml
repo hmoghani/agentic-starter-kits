@@ -6,7 +6,7 @@
 # Prerequisites:
 #   - oc CLI logged into an OpenShift cluster
 #   - A vLLM endpoint serving /v1/responses with tool calling enabled
-#     (vLLM v0.25.x+ required — RHOAI EA v0.19.1 does not support Codex)
+#     (use --tool-call-parser qwen3_coder or hermes, NOT openai)
 #
 # Usage:
 #   oc new-project <your-namespace>
