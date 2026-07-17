@@ -36,7 +36,7 @@ Codex CLI is released under the [Apache 2.0 license](https://github.com/openai/c
 
 - `podman` installed locally (on macOS, also run `podman machine init` and `podman machine start`)
 - `oc` CLI installed and logged into your OpenShift cluster
-- A vLLM endpoint serving the OpenAI Responses API at `/v1/responses` with tool calling enabled (`--enable-auto-tool-choice --tool-call-parser <parser>`). **Important:** gpt-oss models reject namespace tools on all vLLM versions and parsers — use an open-source model (e.g., Qwen3, Llama) instead. See [Responses API Compatibility](#responses-api-compatibility).
+- A vLLM endpoint serving the OpenAI Responses API at `/v1/responses` with tool calling enabled (`--enable-auto-tool-choice --tool-call-parser <parser>`). **Important:** harmony models (gpt-oss) do not yet support namespace tools in vLLM — use a non-harmony model (e.g., Qwen3, Llama). See [Responses API Compatibility](#responses-api-compatibility).
 
 Codex CLI uses the **Responses API exclusively**. It does not use the Chat Completions API (`/v1/chat/completions`). Your vLLM server must support `/v1/responses` and tool calling with namespace tool types.
 
@@ -567,7 +567,7 @@ Codex sends `namespace` tool types with every request. Whether vLLM accepts them
 | Qwen3-8B | `qwen3_coder` | Upstream v0.24.0 | Works |
 | Qwen3-8B | `qwen3_coder` | Upstream v0.25.1 | Works |
 
-The `"tool type namespace not supported"` error is specific to the **gpt-oss model family** (`GptOssForCausalLM` architecture). It occurs on all vLLM versions and all parsers — the rejection happens in a gpt-oss-specific code path in vLLM's Responses API layer, before the tool call parser is invoked. Namespace tool support for gpt-oss may be restricted to OpenAI's hosted infrastructure.
+The `"tool type namespace not supported"` error is specific to **harmony models** (gpt-oss family / `GptOssForCausalLM` architecture). This is a known vLLM limitation — namespace tool types are supported for non-harmony (open-source) models but not yet implemented for harmony models. The error occurs on all vLLM versions and all parsers.
 
 **To use Codex with vLLM, use an open-source model:**
 
@@ -688,7 +688,7 @@ oc delete project my-codex-project
 
 ### Responses API Only
 
-Codex CLI uses the OpenAI Responses API (`/v1/responses`) exclusively. It does not support the Chat Completions API (`/v1/chat/completions`) or the Anthropic Messages API (`/v1/messages`). Codex sends `namespace` tool types with every request. The gpt-oss model family rejects namespace tools with `"tool type namespace not supported"` on all vLLM versions and parsers — use open-source models (Qwen3, Llama, etc.) instead. Full end-to-end Codex functionality requires vLLM v0.24.0+. See [Responses API Compatibility](#responses-api-compatibility) for details.
+Codex CLI uses the OpenAI Responses API (`/v1/responses`) exclusively. It does not support the Chat Completions API (`/v1/chat/completions`) or the Anthropic Messages API (`/v1/messages`). Codex sends `namespace` tool types with every request. Namespace tools are a known unsupported feature for harmony models (gpt-oss) in vLLM — use non-harmony models (Qwen3, Llama, etc.) instead. Full end-to-end Codex functionality requires vLLM v0.24.0+. See [Responses API Compatibility](#responses-api-compatibility) for details.
 
 ### Open Source Model Quality
 
