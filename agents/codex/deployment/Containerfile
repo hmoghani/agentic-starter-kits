@@ -18,6 +18,10 @@
 # - Git credential injection via GITHUB_PAT
 # - Non-root user compatible with restricted-v2 SCC
 
+# Base image built from source (see Containerfile.base).
+# Default points to quay.io/hmoghani — this will move to an org-owned
+# registry (e.g., quay.io/opendatahub) once access is provisioned.
+# To build the base image yourself: see Containerfile.base instructions.
 ARG BASE_IMAGE=quay.io/hmoghani/codex-base:latest
 FROM ${BASE_IMAGE}
 

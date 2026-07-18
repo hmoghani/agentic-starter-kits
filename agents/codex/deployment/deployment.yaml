@@ -169,10 +169,15 @@ spec:
 
             # ── vLLM connection ──────────────────────────────────────
             # UPDATE THESE to match your vLLM endpoint.
+            # Create the secret first:
+            #   oc create secret generic codex-api-key --from-literal=api-key=dummy
             - name: OPENAI_BASE_URL
               value: "http://vllm-svc.your-namespace.svc.cluster.local/v1"
             - name: OPENAI_API_KEY
-              value: "dummy"
+              valueFrom:
+                secretKeyRef:
+                  name: codex-api-key
+                  key: api-key
             - name: OPENAI_MODEL
               value: "your-model-id"
 

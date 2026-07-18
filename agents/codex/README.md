@@ -54,7 +54,7 @@ Codex uses a two-stage image build: a **base image** containing the Codex Rust b
 
 ### Build the base image
 
-The base image uses a multi-stage Dockerfile. The builder stage compiles Codex and bubblewrap (`bwrap`) from the upstream Apache 2.0 source using the official Rust toolchain, producing auditable binaries with no opaque pre-built artifacts. Only the compiled binaries are copied into the clean UBI 9 minimal runtime. The runtime stage installs Node.js 16 and npm from UBI repos for npx-based MCP servers.
+The base image uses a multi-stage Dockerfile. The builder stage compiles Codex and bubblewrap (`bwrap`) from the upstream Apache 2.0 source using the official Rust toolchain, producing auditable binaries with no opaque pre-built artifacts. Only the compiled binaries are copied into the clean UBI 9 minimal runtime. The runtime stage installs Node.js and npm from UBI repos for npx-based MCP servers.
 
 #### Build requirements
 

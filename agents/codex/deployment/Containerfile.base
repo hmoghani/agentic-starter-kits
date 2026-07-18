@@ -28,7 +28,7 @@
 # $BUILDPLATFORM ensures this stage runs natively (no QEMU).
 # We cross-compile to the $TARGETPLATFORM using Rust's --target flag.
 
-FROM --platform=$BUILDPLATFORM docker.io/library/rust:1-bookworm AS builder
+FROM --platform=$BUILDPLATFORM docker.io/library/rust:1.87.0-bookworm AS builder
 
 ARG CODEX_VERSION=rust-v0.144.0
 ARG TARGETARCH
