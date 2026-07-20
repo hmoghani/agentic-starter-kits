@@ -1,3 +1,5 @@
+> **This content has moved.** See the [MLflow Tracing section](../../README.md#mlflow-tracing) of the unified deployment guide. This file is kept for existing links and will be removed in a future release.
+
 # MLflow Tracing Setup for OpenCode on RHOAI
 
 Enable MLflow tracing for OpenCode on Red Hat OpenShift AI. Works in both web and CLI modes.

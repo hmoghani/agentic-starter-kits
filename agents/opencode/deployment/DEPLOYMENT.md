@@ -1,3 +1,5 @@
+> **This content has moved.** See the [unified deployment guide](../README.md) for the current version. This file is kept for existing links and will be removed in a future release.
+
 # OpenCode on Red Hat OpenShift AI — Deployment Guide
 
 This guide covers deploying [OpenCode](https://opencode.ai) as a coding agent on Red Hat OpenShift AI, including image versioning, configuration, and two deployment modes (web and CLI).

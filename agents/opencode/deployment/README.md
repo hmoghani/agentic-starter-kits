@@ -1,33 +1,21 @@
-# OpenCode — OpenShell Sandbox Deployment
+# OpenCode Deployment Files
 
-This directory contains an OpenShell-compatible Containerfile for running [OpenCode](https://github.com/sst/opencode) inside an OpenShell sandbox.
+This directory contains the Containerfiles, entrypoints, and deployment manifests for running OpenCode on OpenShift.
 
-## Prerequisites
+For the full deployment guide, see the [OpenCode on RHOAI README](../README.md).
 
-- [Podman](https://podman.io/) or Docker installed
-- [OpenShell CLI](https://github.com/NVIDIA/OpenShell-Community) installed
-- An OpenShell gateway running
+## Files
 
-## Build and Run
-
-```bash
-podman build --platform linux/amd64 -t opencode-sandbox:latest -f Containerfile.openshell .
-openshell sandbox create --from opencode-sandbox:latest
-```
-
-## What `Containerfile.openshell` does
-
-Builds on the shared base image (`quay.io/hmoghani/openshell-base`) which provides the `sandbox` user, system packages, and OpenShell entrypoint. This flavor adds:
-
-- Node.js and npm (from UBI repos)
-- OpenCode via npm (version pinned, MIT)
-
-## RHOAI Deployment
-
-For deploying OpenCode on Red Hat OpenShift AI with OAuth, kustomize manifests, and production configuration, see [DEPLOYMENT.md](DEPLOYMENT.md).
-
-## Notes
-
-- OpenShell's supervisor takes over as PID 1 and does not automatically run OpenCode. Start it manually inside the sandbox.
-- Build with `--platform linux/amd64` when targeting x86_64 clusters from Apple Silicon machines.
-- Tested on OpenShell v0.0.58, OpenShift 4.21 (June 2026). OpenCode version 1.17.1.
+| File | Description |
+|------|-------------|
+| `manifests/` | Base kustomize manifests (web mode + OAuth proxy) |
+| `overlays/cli/` | CLI mode overlay (headless, no OAuth, `oc exec`) |
+| `overlays/example/` | Template for custom environments |
+| `overlays/mlflow-tracing/` | MLflow tracing overlay |
+| `Containerfile.openshell` | OpenShell sandbox image variant |
+| `Containerfile.mlflow` | MLflow tracing image variant |
+| `Containerfile.a2a` | A2A / Kagenti agent discovery variant |
+| `entrypoint-a2a.sh` | Entrypoint for A2A variant (runs opencode serve + opencode-a2a) |
+| `kagenti-agent.yaml` | OpenShift Template for Kagenti-compatible deployment |
+| `README-a2a.md` | A2A / Kagenti deployment guide |
+| `docs/` | MLflow tracing schema, benchmarks, and screenshots |
