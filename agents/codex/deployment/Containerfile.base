@@ -1,8 +1,8 @@
 # Codex CLI Base Image
 #
 # Multi-stage build that compiles Codex CLI from source (Apache 2.0)
-# and produces a clean UBI 9 minimal runtime image. Extended by flavor
-# images (Containerfile, Containerfile.mlflow, etc.).
+# and produces a clean UBI 9 minimal runtime image. This is an alternative
+# to the npm-based Containerfile for supply chain auditable builds.
 #
 # The builder uses cross-compilation so it runs natively on the host
 # (e.g., ARM64 on Apple Silicon) while producing an x86_64 binary.

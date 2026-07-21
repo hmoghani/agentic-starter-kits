@@ -6,7 +6,7 @@
 # Prerequisites:
 #   - oc CLI logged into an OpenShift cluster
 #   - A vLLM endpoint serving /v1/responses with tool calling enabled
-#     (use --tool-call-parser qwen3_coder or hermes, NOT openai)
+#     (non-harmony models only — harmony/gpt-oss models do not support namespace tools)
 #
 # Usage:
 #   oc new-project <your-namespace>
@@ -15,7 +15,7 @@
 #   oc rollout status deployment/codex
 #
 # Then connect:
-#   oc exec -it deployment/codex -- bash
+#   oc exec -it deployment/codex -- bash -l
 #   codex-run exec "What files are in the current directory?"
 #
 # Update the OPENAI_BASE_URL, OPENAI_MODEL, and OPENAI_API_KEY below
@@ -42,9 +42,7 @@ spec:
 # Recommended: build locally and push to the internal registry.
 # See the README for full instructions.
 #
-#   podman build --platform linux/amd64 -t codex-base:latest -f Containerfile.base .
-#   podman build --platform linux/amd64 -t codex:latest -f Containerfile \
-#     --build-arg BASE_IMAGE=codex-base:latest .
+#   podman build --platform linux/amd64 -t codex:latest -f Containerfile .
 #   podman push <registry>/<namespace>/codex:latest
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
