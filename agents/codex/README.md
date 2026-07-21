@@ -50,83 +50,35 @@ cd deployment/
 
 ## Step 1: Build the Container Image
 
-Codex uses a two-stage image build: a **base image** containing the Codex Rust binary on UBI 9 minimal, and a **flavor image** that extends it with the RHOAI entrypoint, MCP injection, and session persistence.
-
-### Build the base image
-
-The base image uses a multi-stage Dockerfile. The builder stage compiles Codex and bubblewrap (`bwrap`) from the upstream Apache 2.0 source using the official Rust toolchain, producing auditable binaries with no opaque pre-built artifacts. Only the compiled binaries are copied into the clean UBI 9 minimal runtime. The runtime stage installs Node.js and npm from UBI repos for npx-based MCP servers.
-
-#### Build requirements
-
-| Resource | Minimum | Notes |
-|----------|---------|-------|
-| RAM | 32 GB | Podman VM must be configured with `podman machine set --memory 32768`. The Rust linker requires this during the final linking step of the 130+ crate workspace. |
-| Disk | 50 GB | The builder stage downloads ~1.5 GB of Rust crate sources and produces ~20 GB of intermediate compilation artifacts. These are cleaned up before the layer is committed, but the space is needed during the build. |
-| Time | ~12 min | Cross-compiling from ARM64 to x86_64. Native x86_64 builds are faster. |
-| Network | Required | The builder clones the Codex source from GitHub and downloads the Rust toolchain + crate registry. Not needed once the image is built. |
-
-On Apple Silicon Macs, the builder uses cross-compilation (not QEMU emulation) to produce an x86_64 binary. This avoids the SIGSEGV crashes that occur when running `rustc` under QEMU, but requires more RAM than a native build. The upstream release profile's thin LTO is disabled during cross-compilation to stay within memory limits — the binary is functionally identical, just slightly larger.
-
-Native x86_64 builds (e.g., on the cluster via `oc start-build` or in CI) do not have the 32 GB RAM constraint and can use the default podman/Docker settings.
-
-#### Podman machine setup (macOS only)
-
-```bash
-# First time
-podman machine init --memory 32768 --disk-size 100
-
-# Or update an existing machine
-podman machine stop
-podman machine set --memory 32768
-podman machine start
-```
-
-#### Build commands
-
-```bash
-podman build --platform linux/amd64 \
-  -t codex-base:latest \
-  -f Containerfile.base .
-
-# Build with a specific version (use rust-v* git tags)
-podman build --platform linux/amd64 \
-  --build-arg CODEX_VERSION=rust-v0.144.0 \
-  -t codex-base:0.144.0 \
-  -f Containerfile.base .
-```
-
-### Build the RHOAI flavor image
-
-The flavor image extends the base with the RHOAI entrypoint. This is a fast build (~5 seconds) since it only adds shell scripts.
+The Codex CLI binary installed in this image is a pre-built artifact published by OpenAI via npm (`@openai/codex`). It has not been built, scanned, or validated according to Red Hat standards. Use it at your own discretion. To build from source instead, see `Containerfile.base`.
 
 ```bash
 podman build --platform linux/amd64 \
   -t codex:latest \
-  -f Containerfile \
-  --build-arg BASE_IMAGE=codex-base:latest .
+  -f Containerfile .
+
+# Build with a specific version
+podman build --platform linux/amd64 \
+  --build-arg CODEX_VERSION=0.144.0 \
+  -t codex:0.144.0 \
+  -f Containerfile .
 ```
+
+Always pass `--platform linux/amd64` when building on Apple Silicon — the npm package downloads a platform-specific binary, and x86_64 is required for OpenShift nodes.
 
 ### Version pinning
 
-The `CODEX_VERSION` build arg controls which git tag to build from. It defaults to `rust-v0.144.0`. Pin it explicitly for reproducible builds:
+The `CODEX_VERSION` build arg controls which npm package version to install. It defaults to `0.144.0`. Available versions are listed at [npmjs.com/package/@openai/codex](https://www.npmjs.com/package/@openai/codex).
 
-```bash
-podman build --platform linux/amd64 \
-  --build-arg CODEX_VERSION=rust-v0.144.0 \
-  -t codex-base:0.144.0 \
-  -f Containerfile.base .
-```
-
-Available tags are listed at [github.com/openai/codex/releases](https://github.com/openai/codex/releases). Use the `rust-v*` tags.
-
-### Image sizes
+### Image size
 
 | Image | Approximate Size | Contents |
 |-------|-----------------|----------|
-| `codex-base` | ~579 MB | UBI 9 minimal + Codex + bwrap (compiled from source) + git, jq, tar, nodejs, npm |
-| `codex` (flavor) | ~579 MB | Base + entrypoint.sh, codex-run wrapper |
+| `codex` | ~579 MB | UBI 9 minimal + Codex CLI (via npm) + git, jq, tar, nodejs, npm + entrypoint |
 
-The flavor image adds only shell scripts, so its size is effectively the same as the base.
+### Building from source (alternative)
+
+For supply chain trust, `Containerfile.base` compiles Codex from the upstream Apache 2.0 source using the Rust toolchain. This produces an auditable binary with no pre-built artifacts. See the header comments in `Containerfile.base` for build instructions. Building from source requires 32 GB+ RAM in the podman VM for cross-compilation on Apple Silicon.
 
 ---
 
@@ -162,11 +114,13 @@ oc apply -f deployment.yaml
 
 # Build locally and push to the internal registry (recommended)
 #
-# Build locally (see Step 1), then push:
-oc registry login
-podman tag codex:latest \
-  $(oc registry info)/$(oc project -q)/codex:latest
-podman push $(oc registry info)/$(oc project -q)/codex:latest
+# Get the external registry route and login:
+REGISTRY=$(oc get route -n openshift-image-registry -o jsonpath='{.items[0].spec.host}')
+podman login "${REGISTRY}" -u $(oc whoami) -p $(oc whoami -t) --tls-verify=false
+#
+# Tag and push:
+podman tag codex:latest "${REGISTRY}/$(oc project -q)/codex:latest"
+podman push "${REGISTRY}/$(oc project -q)/codex:latest" --tls-verify=false
 #
 # Import into the ImageStream
 oc tag --source=docker \
@@ -223,10 +177,10 @@ The deployment runs `sleep infinity` so the pod stays alive for `oc exec` sessio
 
 ### The codex-run Wrapper
 
-The entrypoint generates a `codex-run` wrapper script at `~/.codex/codex-run` that includes all container-configured arguments (model, sandbox mode, provider config). Use it for all `oc exec` sessions:
+The entrypoint generates a `codex-run` wrapper script at `~/.codex/codex-run` that includes all container-configured arguments (model, sandbox mode, provider config). Use it for all `oc exec` sessions. Use `bash -l` (login shell) so `.bashrc` adds `~/.codex` to PATH:
 
 ```bash
-oc exec deployment/codex -- bash -c '
+oc exec deployment/codex -- bash -lc '
   codex-run exec "Your prompt here"
 '
 ```
@@ -245,9 +199,7 @@ oc exec deployment/codex -- bash -c '
 For multi-turn conversations with a TTY:
 
 ```bash
-oc exec -it deployment/codex -- bash -c '
-  codex-run
-'
+oc exec -it deployment/codex -- bash -lc 'codex-run'
 ```
 
 Interactive mode requires the `-it` flags on `oc exec`. Without them, the TUI will not render and Codex will exit immediately.
@@ -258,12 +210,12 @@ The `codex exec` subcommand runs a prompt non-interactively and exits when compl
 
 ```bash
 # Single prompt
-oc exec deployment/codex -- bash -c '
+oc exec deployment/codex -- bash -lc '
   codex-run exec "Explain the structure of this project"
 '
 
 # With a specific working directory
-oc exec deployment/codex -- bash -c '
+oc exec deployment/codex -- bash -lc '
   cd /workspace/projects/my-repo && codex-run exec "Run the tests and fix any failures"
 '
 ```
@@ -293,12 +245,12 @@ oc exec deployment/codex -- ls -la /workspace/projects/
 After modifying the Containerfile or entrypoint, rebuild locally and push:
 
 ```bash
-podman build --platform linux/amd64 -t codex:latest -f Containerfile \
-  --build-arg BASE_IMAGE=codex-base:latest .
+podman build --platform linux/amd64 -t codex:latest -f Containerfile .
 
-oc registry login
-podman tag codex:latest $(oc registry info)/$(oc project -q)/codex:latest
-podman push $(oc registry info)/$(oc project -q)/codex:latest
+REGISTRY=$(oc get route -n openshift-image-registry -o jsonpath='{.items[0].spec.host}')
+podman login "${REGISTRY}" -u $(oc whoami) -p $(oc whoami -t) --tls-verify=false
+podman tag codex:latest "${REGISTRY}/$(oc project -q)/codex:latest"
+podman push "${REGISTRY}/$(oc project -q)/codex:latest" --tls-verify=false
 
 oc import-image codex:latest --confirm
 oc rollout restart deployment/codex
@@ -456,14 +408,14 @@ The JSON-to-TOML conversion supports `url`, `command`, and `args` fields. For MC
 | Remote HTTP | `url` | Remote MCP servers | Network access to endpoint |
 | Local process | `command` + `args` | Process-based MCP servers | Executable must exist in container |
 
-The base image includes `git`, `curl-minimal`, `jq`, `tar`, `nodejs`, and `npm`. Command-based MCP servers using `npx` work out of the box. For servers requiring other runtimes, see [Extending the Container Image](#extending-the-container-image).
+The image includes `git`, `curl-minimal`, `jq`, `tar`, `nodejs`, and `npm`. Command-based MCP servers using `npx` work out of the box. For servers requiring other runtimes, see [Extending the Container Image](#extending-the-container-image).
 
 ### Extending the Container Image
 
-The base image includes `git`, `curl-minimal`, `jq`, `tar`, `nodejs`, `npm`, and `bash`. For real coding workflows, add language runtimes so the agent can run tests, lint, and build. Including the runtimes your project uses significantly improves agent output quality since the agent can run tests and catch its own mistakes.
+The image includes `git`, `curl-minimal`, `jq`, `tar`, `nodejs`, `npm`, and `bash`. For real coding workflows, add language runtimes so the agent can run tests, lint, and build. Including the runtimes your project uses significantly improves agent output quality since the agent can run tests and catch its own mistakes.
 
 ```dockerfile
-# In the "System dependencies" section of Containerfile.base
+# In the "System dependencies" section of Containerfile
 RUN microdnf install -y --nodocs \
         git \
         jq \
@@ -667,7 +619,7 @@ Common causes:
 
 - `CODEX_HOME` directory not writable (PVC not mounted or permissions issue)
 - Invalid TOML in ConfigMap (syntax error in config.toml or mcp-servers.toml)
-- Missing base image (flavor Containerfile references a base image that has not been built)
+- npm registry unreachable (Codex CLI downloaded from npm at build time)
 
 ---
 
@@ -675,8 +627,8 @@ Common causes:
 
 ```bash
 oc delete deployment codex
-oc delete buildconfig codex codex-base 2>/dev/null
-oc delete imagestream codex codex-base 2>/dev/null
+oc delete buildconfig codex 2>/dev/null
+oc delete imagestream codex 2>/dev/null
 oc delete configmap codex-config codex-mcp-config
 oc delete pvc codex-workspace
 oc delete project my-codex-project
@@ -704,4 +656,4 @@ Codex CLI uses TOML for all configuration (`config.toml`). There is no JSON sett
 
 ### OpenShell Sandbox Variant
 
-The `Containerfile.openshell` builds a separate image for the OpenShell sandbox environment. This variant uses a different base image (`openshell-base`), installs Codex via npm (not the extracted Rust binary), and does not include the RHOAI entrypoint or session persistence. It is intended for ephemeral sandbox sessions, not persistent OpenShift deployments.
+The `Containerfile.openshell` builds a separate image for the OpenShell sandbox environment. This variant uses a different base image (`openshell-base`) and does not include the RHOAI entrypoint or session persistence. It is intended for ephemeral sandbox sessions, not persistent OpenShift deployments.

@@ -1,45 +1,79 @@
 # Codex CLI — RHOAI Flavor
 #
-# Extends the Codex base image with RHOAI-specific configuration:
+# Container image for running OpenAI's Codex CLI on RHOAI.
+#
+# ⚠ Important: The Codex CLI binary installed in this image is a pre-built
+# artifact published by OpenAI via npm (@openai/codex). It has not been
+# built, scanned, or validated according to Red Hat standards. Use it at
+# your own discretion. To build from source instead, use Containerfile.base.
+#
+# Build:
+#   podman build --platform linux/amd64 -t codex:latest -f Containerfile .
+#
+# Features:
+# - Codex CLI installed via npm (version-pinned, Apache 2.0)
 # - Entrypoint with env-var-driven setup (auth, model provider, MCP, git)
 # - codex-run wrapper for oc exec convenience
 # - Session persistence via PVC-backed CODEX_HOME
-#
-# Build the base image first, then this flavor:
-#   podman build --platform linux/amd64 -t codex-base:latest -f Containerfile.base .
-#   podman build --platform linux/amd64 -t codex:latest -f Containerfile \
-#     --build-arg BASE_IMAGE=codex-base:latest .
-#
-# Features:
 # - Configurable inference endpoint (vLLM, OpenAI, OpenRouter)
-# - MCP server configuration injectable at runtime via environment variables:
-#     MCP_CONFIG_TOML - path to a TOML file with [mcp_servers.*] tables
-#     MCP_CONFIG_JSON - inline JSON string with MCP server definitions
-# - Git credential injection via GITHUB_PAT
+# - MCP server configuration injectable at runtime via environment variables
 # - Non-root user compatible with restricted-v2 SCC
 
-# Base image built from source (see Containerfile.base).
-# Default points to quay.io/hmoghani — this will move to an org-owned
-# registry (e.g., quay.io/opendatahub) once access is provisioned.
-# To build the base image yourself: see Containerfile.base instructions.
-ARG BASE_IMAGE=quay.io/hmoghani/codex-base:latest
-FROM ${BASE_IMAGE}
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:8201445bebcb5bd4fe23fcc2a76cd5fec029ab401d270926a1563c03b36f0137
+
+ARG CODEX_VERSION=0.144.0
+ARG USER_NAME=codex-agent
+ARG USER_UID=1001
+ARG USER_GID=0
 
 LABEL name="codex" \
+      version="${CODEX_VERSION}" \
       vendor="Red Hat" \
       summary="Codex CLI agent for OpenShift AI" \
       description="RHOAI-flavored Codex CLI with entrypoint, MCP injection, and session persistence" \
       license="Apache-2.0"
 
-USER 0
+# System dependencies
+# - git: Version control (agent clones repos, makes commits)
+# - jq: JSON processor (used by entrypoint for MCP config conversion)
+# - tar: Required by oc cp for file retrieval
+# - nodejs + npm: Install Codex CLI and run npx-based MCP servers
+# Note: curl-minimal is pre-installed in ubi-minimal; full curl conflicts
+RUN microdnf install -y --nodocs \
+        git \
+        jq \
+        tar \
+        nodejs \
+        npm \
+    && microdnf clean all \
+    && rm -rf /var/cache/yum
 
-# Remove ~/.codex created during base build — entrypoint will create a symlink
+# Create non-root user (OpenShift restricted-v2 SCC compatible)
+RUN useradd -u ${USER_UID} -g ${USER_GID} -d /home/${USER_NAME} -m -s /bin/bash ${USER_NAME}
+
+# Workspace and config directories
+RUN mkdir -p /workspace/projects /home/${USER_NAME}/.codex \
+    && chown -R ${USER_UID}:${USER_GID} /workspace /home/${USER_NAME} \
+    && chmod -R 775 /workspace /home/${USER_NAME}
+
+# Install Codex CLI via npm (pre-built binary, Apache 2.0)
+# The npm package is a thin wrapper that downloads the platform-specific
+# Rust binary. For a source-built alternative, see Containerfile.base.
+RUN npm install -g @openai/codex@${CODEX_VERSION}
+
+# Verify
+RUN codex --version
+
+ENV HOME="/home/${USER_NAME}" \
+    PATH="/home/${USER_NAME}/.local/bin:${PATH}"
+
+# Remove ~/.codex created during install — entrypoint will create a symlink
 # to /workspace/.codex for PVC-backed persistence
-RUN rm -rf /home/codex-agent/.codex
+RUN rm -rf /home/${USER_NAME}/.codex
 
 COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
 
-USER 1001
+USER ${USER_UID}
 WORKDIR /workspace/projects
 
 ENTRYPOINT ["entrypoint.sh"]

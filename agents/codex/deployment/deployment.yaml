@@ -180,6 +180,14 @@ spec:
                   key: api-key
             - name: OPENAI_MODEL
               value: "your-model-id"
+            # CODEX_API_KEY is required for codex exec (headless mode).
+            # The entrypoint propagates OPENAI_API_KEY, but only when
+            # running codex directly — not in sleep infinity + oc exec mode.
+            - name: CODEX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: codex-api-key
+                  key: api-key
 
             # ── Sandbox ──────────────────────────────────────────────
             # Container itself is the isolation boundary

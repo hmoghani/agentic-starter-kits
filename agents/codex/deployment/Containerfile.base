@@ -82,10 +82,12 @@ WORKDIR /src/codex-rs
 # during cross-compilation linking. Disable it for cross builds —
 # the binary is functionally identical, just slightly larger.
 RUN CARGO_PROFILE_RELEASE_LTO=false \
-    cargo build --release --target x86_64-unknown-linux-gnu --bin codex --bin bwrap \
+    cargo build --release --target x86_64-unknown-linux-gnu \
+        --bin codex --bin bwrap --bin codex-code-mode-host \
     && cp target/x86_64-unknown-linux-gnu/release/codex /opt/codex \
     && cp target/x86_64-unknown-linux-gnu/release/bwrap /opt/bwrap \
-    && chmod +x /opt/codex /opt/bwrap \
+    && cp target/x86_64-unknown-linux-gnu/release/codex-code-mode-host /opt/codex-code-mode-host \
+    && chmod +x /opt/codex /opt/bwrap /opt/codex-code-mode-host \
     && rm -rf target /src /usr/local/cargo/registry
 
 # =============================================================================
@@ -126,6 +128,7 @@ RUN microdnf install -y --nodocs \
 # Copy the compiled binaries from the builder
 COPY --from=builder /opt/codex /usr/local/bin/codex
 COPY --from=builder /opt/bwrap /usr/local/bin/bwrap
+COPY --from=builder /opt/codex-code-mode-host /usr/local/bin/codex-code-mode-host
 
 # Create non-root user (OpenShift restricted-v2 SCC compatible)
 RUN useradd -u ${USER_UID} -g ${USER_GID} -d /home/${USER_NAME} -m -s /bin/bash ${USER_NAME}
