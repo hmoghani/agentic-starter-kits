@@ -74,7 +74,7 @@ Several agents diverge significantly from the standard pattern:
 
 **openclaw/deployment** - Kustomize-based deployment of OpenClaw on OpenShift. Uses pre-built image (`ghcr.io/openclaw/openclaw:latest`), not a Dockerfile. Kustomize overlays for customization (model endpoint, storage class). No Makefile, no FastAPI, no src/. Port 18789 (gateway).
 
-**codex/deployment** - CLI-based coding agent (OpenAI Codex CLI, Apache 2.0). Two-stage Containerfile: `Containerfile.base` cross-compiles the Rust binary from source, `Containerfile` extends with RHOAI entrypoint. No Makefile, no pyproject.toml, no FastAPI, no `/chat/completions`, no tests/. Uses `entrypoint.sh` for runtime config, `sleep infinity` for `oc exec` access. Requires vLLM with Responses API (`/v1/responses`) and non-harmony models.
+**codex/deployment** - CLI-based coding agent (OpenAI Codex CLI, Apache 2.0). `Containerfile` installs Codex via npm (pre-built upstream binary with disclaimer); `Containerfile.base` available as source-built alternative. No Makefile, no pyproject.toml, no FastAPI, no `/chat/completions`, no tests/. Uses `entrypoint.sh` for runtime config, `sleep infinity` for `oc exec` access. Requires vLLM with Responses API (`/v1/responses`) and non-harmony models.
 
 ## Common gotchas
 
