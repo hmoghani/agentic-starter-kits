@@ -519,7 +519,7 @@ Codex sends `namespace` tool types with every request. Whether vLLM accepts them
 | Qwen3-8B | `qwen3_coder` | Upstream v0.24.0 | Works |
 | Qwen3-8B | `qwen3_coder` | Upstream v0.25.1 | Works |
 
-The `"tool type namespace not supported"` error is specific to **harmony models** (gpt-oss family / `GptOssForCausalLM` architecture). This is a known vLLM limitation — namespace tool types are supported for non-harmony (open-source) models but not yet implemented for harmony models. The error occurs on all vLLM versions and all parsers.
+The `"tool type namespace not supported"` error is specific to **harmony models** (gpt-oss family / `GptOssForCausalLM` architecture). This is a known vLLM limitation — namespace tool types are supported for non-harmony (open-source) models but not yet implemented for harmony models. The error occurs on all vLLM versions and all parsers. Tracked upstream: [vllm-project/vllm#49493](https://github.com/vllm-project/vllm/issues/49493).
 
 **To use Codex with vLLM, use an open-source model:**
 
