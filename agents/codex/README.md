@@ -533,7 +533,17 @@ vllm serve Qwen/Qwen3-8B \
 
 See the [vLLM Codex integration docs](https://docs.vllm.ai/en/latest/serving/integrations/codex/) for the full list of supported models and parsers.
 
-**Note:** Full end-to-end Codex functionality (tool execution with visible output) requires vLLM v0.24.0 or later.
+**Tool calling on vLLM with open-source models:**
+
+Codex connects and receives responses from open-source models on vLLM, but tool execution (file creation, shell commands) does not work reliably. The model generates tool calls as **text** (e.g., `<tool_call>` XML tags inside `output_text`) instead of structured `function_call` output items. vLLM's Responses API parser does not convert these into the structured format Codex expects. This was tested with both Qwen3-8B and Qwen3-32B on vLLM v0.25.1 — simple prompts work, but tool execution fails silently.
+
+| Model | Simple Prompts | Tool Execution | Notes |
+|---|---|---|---|
+| Qwen3-8B | Works | No | Model reasons but rarely emits tool calls; 8B is borderline for agentic tasks |
+| Qwen3-32B | Works | No | Model emits tool calls as text (`<tool_call>` tags), but vLLM doesn't parse them into structured function calls on the Responses API path |
+| OpenAI models (via OpenAI API) | Works | Works | Native Responses API with proper tool call parsing |
+
+This is a vLLM Responses API limitation — the `qwen3_coder` parser likely works for the Chat Completions API but not the Responses API path. Upstream Codex issues tracking this: [#32318](https://github.com/openai/codex/issues/32318), [#31875](https://github.com/openai/codex/issues/31875), [#31882](https://github.com/openai/codex/issues/31882).
 
 ### Network Connectivity
 
@@ -642,9 +652,9 @@ oc delete project my-codex-project
 
 Codex CLI uses the OpenAI Responses API (`/v1/responses`) exclusively. It does not support the Chat Completions API (`/v1/chat/completions`) or the Anthropic Messages API (`/v1/messages`). Codex sends `namespace` tool types with every request. Namespace tools are a known unsupported feature for harmony models (gpt-oss) in vLLM — use non-harmony models (Qwen3, Llama, etc.) instead. Full end-to-end Codex functionality requires vLLM v0.24.0+. See [Responses API Compatibility](#responses-api-compatibility) for details.
 
-### Open Source Model Quality
+### Open Source Model Tool Calling
 
-Codex CLI is designed for OpenAI's models. Open source models may produce lower quality results, particularly for complex multi-step tasks and tool use chains. Including language runtimes in the container helps because the agent can run tests and iterate on its own output.
+Codex CLI is designed for OpenAI's models. When using open-source models on vLLM, simple prompts (Q&A, reasoning) work, but **tool execution does not**. The models generate tool calls as text rather than structured function call objects, and vLLM's Responses API parser does not convert them. This was tested with Qwen3-8B and Qwen3-32B on vLLM v0.25.1. Until vLLM's Responses API parser supports Qwen3's tool call format, tool-dependent workflows (file creation, shell commands) require an OpenAI backend.
 
 ### No Built-in Permission System
 
