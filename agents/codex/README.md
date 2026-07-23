@@ -555,7 +555,6 @@ Tool execution depends on the model and parser combination. The entrypoint sets 
 | Qwen3-32B | `hermes` | Works | **Works** | Tested on upstream vLLM v0.25.1 — `hermes` parser extracts `<tool_call>` tags correctly |
 | Qwen3-32B | `qwen3_coder` | Works | No | `qwen3_coder` parser does not extract Qwen3-32B's `<tool_call>` format — use `hermes` instead |
 | Qwen3-8B | `qwen3_coder` | Works | No | 8B is too small for reliable tool calling |
-| Nemotron-3-Super-120B | — | Works | Works | Reported working by vLLM engineers |
 | OpenAI models (via OpenAI API) | — | Works | Works | Native Responses API |
 
 **Parser selection matters:** Newer Qwen models (3.6+) work with `qwen3_coder`. Older Qwen3 models (32B, 8B) need `hermes`. Using the wrong parser results in tool calls emitted as text instead of structured function calls.
