@@ -515,15 +515,15 @@ Codex sends `namespace` tool types with every request. Whether vLLM accepts them
 
 | Model | Parser | vLLM Version | Result |
 |---|---|---|---|
-| gpt-oss-120b | `openai` | RHOAI v0.21.0 | `"tool type namespace not supported"` |
+| gpt-oss-120b | `openai` | RHOAI 3.5 EA (vLLM v0.21.0) | `"tool type namespace not supported"` |
 | gpt-oss-120b | `openai` | Upstream v0.25.1 | `"tool type namespace not supported"` |
 | gpt-oss-120b | `hermes` | Upstream v0.25.1 | `"tool type namespace not supported"` |
-| Any model | any | RHOAI v0.21.0 | `"Unexpected message role"` — Codex sends `developer` role which this version doesn't support |
+| Any model | any | RHOAI 3.5 EA (vLLM v0.21.0) | `"Unexpected message role"` — Codex sends `developer` role which this version doesn't support |
 | Qwen3.6-27B | `qwen3_coder` | Upstream v0.25.1 | Works (full tool calling) |
 | Qwen3-32B | `hermes` | Upstream v0.25.1 | Works (full tool calling) |
 | Qwen3-8B | `qwen3_coder` | Upstream v0.25.1 | Namespace accepted, but no tool execution (8B too small) |
 
-The `"tool type namespace not supported"` error is specific to **harmony models** (gpt-oss family / `GptOssForCausalLM` architecture). This is a known vLLM limitation — namespace tool types are supported for non-harmony (open-source) models but not yet implemented for harmony models. The error was observed on all tested vLLM versions (RHOAI v0.21.0, upstream v0.25.1) and parsers (`openai`, `hermes`). Tracked upstream: [vllm-project/vllm#49493](https://github.com/vllm-project/vllm/issues/49493).
+The `"tool type namespace not supported"` error is specific to **harmony models** (gpt-oss family / `GptOssForCausalLM` architecture). This is a known vLLM limitation — namespace tool types are supported for non-harmony (open-source) models but not yet implemented for harmony models. The error was observed on all tested vLLM versions (RHOAI 3.5 EA (vLLM v0.21.0), upstream v0.25.1) and parsers (`openai`, `hermes`). The same error occurs when using OGX as the inference provider. Tracked upstream: [vllm-project/vllm#49493](https://github.com/vllm-project/vllm/issues/49493).
 
 **To use Codex with vLLM, use an open-source model with the correct parser:**
 
@@ -666,7 +666,7 @@ oc delete project my-codex-project
 
 ### Responses API Only
 
-Codex CLI uses the OpenAI Responses API (`/v1/responses`) exclusively. It does not support the Chat Completions API (`/v1/chat/completions`) or the Anthropic Messages API (`/v1/messages`). Codex sends `namespace` tool types with every request. Namespace tools are a known unsupported feature for harmony models (gpt-oss) in vLLM — use non-harmony models instead. Requires upstream vLLM v0.25.1+ (RHOAI 3.5 EA v0.21.0 does not support the `developer` message role). See [Responses API Compatibility](#responses-api-compatibility) for details.
+Codex CLI uses the OpenAI Responses API (`/v1/responses`) exclusively. It does not support the Chat Completions API (`/v1/chat/completions`) or the Anthropic Messages API (`/v1/messages`). Codex sends `namespace` tool types with every request. Namespace tools are a known unsupported feature for harmony models (gpt-oss) in vLLM — use non-harmony models instead. Requires upstream vLLM v0.25.1+ (RHOAI 3.5 EA (vLLM v0.21.0) does not support the `developer` message role). See [Responses API Compatibility](#responses-api-compatibility) for details.
 
 ### Open-Source Model Tool Calling
 
