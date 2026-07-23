@@ -174,15 +174,19 @@ setup_model_provider() {
     base_url=$(sanitize_value "${OPENAI_BASE_URL}")
 
     # Remove any existing model/provider lines so env vars always win
-    sed -i '/^model\s*=/d; /^model_provider\s*=/d' "${config_file}" 2>/dev/null || true
+    sed -i '/^model\s*=/d; /^model_provider\s*=/d; /^model_supports_reasoning_summaries\s*=/d' "${config_file}" 2>/dev/null || true
     sed -i '/^\[model_providers\./,/^$/d' "${config_file}" 2>/dev/null || true
 
-    cat >> "${config_file}" <<EOF
-model = "${model}"
-model_supports_reasoning_summaries = false
+    # Insert top-level keys at the beginning of the file (not end),
+    # so they don't land inside a [section] written by a previous
+    # interactive Codex session.
+    sed -i "1i\\
+model = \"${model}\"\\
+model_supports_reasoning_summaries = false\\
+model_provider = \"vllm\"" "${config_file}"
 
-# Auto-configured by entrypoint.sh
-model_provider = "vllm"
+    # Append the provider section block (safe at end — it's a [section] header)
+    cat >> "${config_file}" <<EOF
 
 [model_providers.vllm]
 name = "vLLM"
