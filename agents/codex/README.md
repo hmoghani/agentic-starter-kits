@@ -68,7 +68,7 @@ Always pass `--platform linux/amd64` when building on Apple Silicon — the npm 
 
 ### Version pinning
 
-The `CODEX_VERSION` build arg controls which npm package version to install. It defaults to `0.144.0`. Available versions are listed at [npmjs.com/package/@openai/codex](https://www.npmjs.com/package/@openai/codex).
+The `CODEX_VERSION` build arg controls which npm package version to install. It defaults to `0.144.0`. Available versions are listed at [github.com/openai/codex/releases](https://github.com/openai/codex/releases).
 
 ### Image size
 
