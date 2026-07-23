@@ -518,7 +518,7 @@ Codex sends `namespace` tool types with every request. Whether vLLM accepts them
 | gpt-oss-120b | `openai` | RHOAI v0.21.0 | `"tool type namespace not supported"` |
 | gpt-oss-120b | `openai` | Upstream v0.25.1 | `"tool type namespace not supported"` |
 | gpt-oss-120b | `hermes` | Upstream v0.25.1 | `"tool type namespace not supported"` |
-| Qwen3.6-27B | `qwen3_coder` | RHOAI v0.21.0 | `"Unexpected message role"` (needs v0.25.1+) |
+| Any model | any | RHOAI v0.21.0 | `"Unexpected message role"` — Codex sends `developer` role which this version doesn't support |
 | Qwen3.6-27B | `qwen3_coder` | Upstream v0.25.1 | Works (full tool calling) |
 | Qwen3-32B | `hermes` | Upstream v0.25.1 | Works (full tool calling) |
 | Qwen3-8B | `qwen3_coder` | Upstream v0.25.1 | Namespace accepted, but no tool execution (8B too small) |
@@ -559,7 +559,7 @@ Tool execution depends on the model and parser combination. The entrypoint sets 
 
 **Parser selection matters:** Newer Qwen models (3.6+) work with `qwen3_coder`. Older Qwen3 models (32B, 8B) need `hermes`. Using the wrong parser results in tool calls emitted as text instead of structured function calls.
 
-**vLLM version requirements:** Upstream vLLM v0.25.1+ is required. RHOAI vLLM 3.5 EA (v0.21.0) returns `"Unexpected message role"` with newer models like Qwen3.6-27B because it doesn't support the `developer` message role. RHOAI 3.6 EA (expected to be based on v0.26+) should include this fix.
+**vLLM version requirements:** Upstream vLLM v0.25.1+ is required. RHOAI vLLM 3.5 EA (v0.21.0) returns `"Unexpected message role"` because Codex sends `developer` role messages which that version doesn't support (fixed upstream in [PR #43590](https://github.com/vllm-project/vllm/pull/43590)). RHOAI 3.6 EA (expected to be based on v0.26+) should include this fix.
 
 ### Network Connectivity
 
