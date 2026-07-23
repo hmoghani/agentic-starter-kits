@@ -37,17 +37,6 @@
 
 set -euo pipefail
 
-# Temp files to clean up on exit
-TEMP_FILES=()
-
-cleanup_temp_files() {
-    for f in "${TEMP_FILES[@]}"; do
-        rm -f "$f" 2>/dev/null || true
-    done
-}
-
-trap cleanup_temp_files EXIT
-
 # =============================================================================
 # Helper Functions
 # =============================================================================
@@ -190,6 +179,7 @@ setup_model_provider() {
 
     cat >> "${config_file}" <<EOF
 model = "${model}"
+model_supports_reasoning_summaries = false
 
 # Auto-configured by entrypoint.sh
 model_provider = "vllm"
@@ -199,6 +189,7 @@ name = "vLLM"
 base_url = "${base_url}"
 env_key = "OPENAI_API_KEY"
 wire_api = "responses"
+supports_websockets = false
 EOF
 
     log_info "Configured vLLM provider: ${base_url} (model: ${model})"
