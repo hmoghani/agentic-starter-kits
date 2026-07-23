@@ -36,7 +36,7 @@ Codex CLI is released under the [Apache 2.0 license](https://github.com/openai/c
 
 - `podman` installed locally (on macOS, also run `podman machine init` and `podman machine start`)
 - `oc` CLI installed and logged into your OpenShift cluster
-- A vLLM endpoint serving the OpenAI Responses API at `/v1/responses` with tool calling enabled (`--enable-auto-tool-choice --tool-call-parser <parser>`). **Important:** harmony models (gpt-oss) do not yet support namespace tools in vLLM — use a non-harmony model (e.g., Qwen3, Llama). See [Responses API Compatibility](#responses-api-compatibility).
+- A vLLM endpoint (upstream v0.25.1+) serving the OpenAI Responses API at `/v1/responses` with tool calling enabled (`--enable-auto-tool-choice --tool-call-parser <parser>`). **Important:** harmony models (gpt-oss) do not support namespace tools — use a non-harmony model. See [Responses API Compatibility](#responses-api-compatibility) for tested model/parser combinations.
 
 Codex CLI uses the **Responses API exclusively**. It does not use the Chat Completions API (`/v1/chat/completions`). Your vLLM server must support `/v1/responses` and tool calling with namespace tool types.
 
@@ -308,6 +308,7 @@ The entrypoint auto-generates model provider configuration from the `OPENAI_BASE
 ```toml
 # Auto-configured by entrypoint.sh
 model = "your-model-id"
+model_supports_reasoning_summaries = false
 model_provider = "vllm"
 
 [model_providers.vllm]
@@ -315,6 +316,7 @@ name = "vLLM"
 base_url = "http://vllm-svc.namespace.svc.cluster.local/v1"
 env_key = "OPENAI_API_KEY"
 wire_api = "responses"
+supports_websockets = false
 ```
 
 **Manual config.toml example** (for advanced setups, place in the ConfigMap):
@@ -516,18 +518,28 @@ Codex sends `namespace` tool types with every request. Whether vLLM accepts them
 | gpt-oss-120b | `openai` | RHOAI v0.21.0 | `"tool type namespace not supported"` |
 | gpt-oss-120b | `openai` | Upstream v0.25.1 | `"tool type namespace not supported"` |
 | gpt-oss-120b | `hermes` | Upstream v0.25.1 | `"tool type namespace not supported"` |
-| Qwen3-8B | `qwen3_coder` | Upstream v0.24.0 | Works |
-| Qwen3-8B | `qwen3_coder` | Upstream v0.25.1 | Works |
+| Qwen3.6-27B | `qwen3_coder` | RHOAI v0.21.0 | `"Unexpected message role"` (needs v0.25.1+) |
+| Qwen3.6-27B | `qwen3_coder` | Upstream v0.25.1 | Works (full tool calling) |
+| Qwen3-32B | `hermes` | Upstream v0.25.1 | Works (full tool calling) |
+| Qwen3-8B | `qwen3_coder` | Upstream v0.25.1 | Namespace accepted, but no tool execution (8B too small) |
 
 The `"tool type namespace not supported"` error is specific to **harmony models** (gpt-oss family / `GptOssForCausalLM` architecture). This is a known vLLM limitation — namespace tool types are supported for non-harmony (open-source) models but not yet implemented for harmony models. The error occurs on all vLLM versions and all parsers. Tracked upstream: [vllm-project/vllm#49493](https://github.com/vllm-project/vllm/issues/49493).
 
-**To use Codex with vLLM, use an open-source model:**
+**To use Codex with vLLM, use an open-source model with the correct parser:**
 
 ```bash
-# Example: Qwen3-8B (tested, works with Codex)
-vllm serve Qwen/Qwen3-8B \
+# Qwen3.6-27B (tested, full tool calling works)
+vllm serve Qwen/Qwen3.6-27B \
+  --trust-remote-code \
   --enable-auto-tool-choice \
   --tool-call-parser qwen3_coder \
+  --reasoning-parser qwen3 \
+  --mm-encoder-tp-mode data
+
+# Qwen3-32B (use hermes parser, not qwen3_coder)
+vllm serve Qwen/Qwen3-32B \
+  --enable-auto-tool-choice \
+  --tool-call-parser hermes \
   --reasoning-parser qwen3
 ```
 
@@ -535,15 +547,20 @@ See the [vLLM Codex integration docs](https://docs.vllm.ai/en/latest/serving/int
 
 **Tool calling on vLLM with open-source models:**
 
-Codex connects and receives responses from open-source models on vLLM, but tool execution (file creation, shell commands) does not work reliably. The model generates tool calls as **text** (e.g., `<tool_call>` XML tags inside `output_text`) instead of structured `function_call` output items. vLLM's Responses API parser does not convert these into the structured format Codex expects. This was tested with both Qwen3-8B and Qwen3-32B on vLLM v0.25.1 — simple prompts work, but tool execution fails silently.
+Tool execution depends on the model and parser combination. The entrypoint sets `supports_websockets = false` and `model_supports_reasoning_summaries = false` in the provider config, which are required for vLLM backends.
 
-| Model | Simple Prompts | Tool Execution | Notes |
-|---|---|---|---|
-| Qwen3-8B | Works | No | Model reasons but rarely emits tool calls; 8B is borderline for agentic tasks |
-| Qwen3-32B | Works | No | Model emits tool calls as text (`<tool_call>` tags), but vLLM doesn't parse them into structured function calls on the Responses API path |
-| OpenAI models (via OpenAI API) | Works | Works | Native Responses API with proper tool call parsing |
+| Model | Parser | Simple Prompts | Tool Execution | Notes |
+|---|---|---|---|---|
+| Qwen3.6-27B | `qwen3_coder` | Works | **Works** | Tested on upstream vLLM v0.25.1 — full tool calling including file creation and shell commands |
+| Qwen3-32B | `hermes` | Works | **Works** | Tested on upstream vLLM v0.25.1 — `hermes` parser extracts `<tool_call>` tags correctly |
+| Qwen3-32B | `qwen3_coder` | Works | No | `qwen3_coder` parser does not extract Qwen3-32B's `<tool_call>` format — use `hermes` instead |
+| Qwen3-8B | `qwen3_coder` | Works | No | 8B is too small for reliable tool calling |
+| Nemotron-3-Super-120B | — | Works | Works | Reported working by vLLM engineers |
+| OpenAI models (via OpenAI API) | — | Works | Works | Native Responses API |
 
-This is a vLLM Responses API limitation — the `qwen3_coder` parser likely works for the Chat Completions API but not the Responses API path. Upstream Codex issues tracking this: [#32318](https://github.com/openai/codex/issues/32318), [#31875](https://github.com/openai/codex/issues/31875), [#31882](https://github.com/openai/codex/issues/31882).
+**Parser selection matters:** Newer Qwen models (3.6+) work with `qwen3_coder`. Older Qwen3 models (32B, 8B) need `hermes`. Using the wrong parser results in tool calls emitted as text instead of structured function calls.
+
+**vLLM version requirements:** Upstream vLLM v0.25.1+ is required. RHOAI vLLM 3.5 EA (v0.21.0) returns `"Unexpected message role"` with newer models like Qwen3.6-27B because it doesn't support the `developer` message role. RHOAI 3.6 EA (expected to be based on v0.26+) should include this fix.
 
 ### Network Connectivity
 
@@ -650,11 +667,17 @@ oc delete project my-codex-project
 
 ### Responses API Only
 
-Codex CLI uses the OpenAI Responses API (`/v1/responses`) exclusively. It does not support the Chat Completions API (`/v1/chat/completions`) or the Anthropic Messages API (`/v1/messages`). Codex sends `namespace` tool types with every request. Namespace tools are a known unsupported feature for harmony models (gpt-oss) in vLLM — use non-harmony models (Qwen3, Llama, etc.) instead. Full end-to-end Codex functionality requires vLLM v0.24.0+. See [Responses API Compatibility](#responses-api-compatibility) for details.
+Codex CLI uses the OpenAI Responses API (`/v1/responses`) exclusively. It does not support the Chat Completions API (`/v1/chat/completions`) or the Anthropic Messages API (`/v1/messages`). Codex sends `namespace` tool types with every request. Namespace tools are a known unsupported feature for harmony models (gpt-oss) in vLLM — use non-harmony models instead. Requires upstream vLLM v0.25.1+ (RHOAI 3.5 EA v0.21.0 does not support the `developer` message role). See [Responses API Compatibility](#responses-api-compatibility) for details.
 
 ### Open Source Model Tool Calling
 
-Codex CLI is designed for OpenAI's models. When using open-source models on vLLM, simple prompts (Q&A, reasoning) work, but **tool execution does not**. The models generate tool calls as text rather than structured function call objects, and vLLM's Responses API parser does not convert them. This was tested with Qwen3-8B and Qwen3-32B on vLLM v0.25.1. Until vLLM's Responses API parser supports Qwen3's tool call format, tool-dependent workflows (file creation, shell commands) require an OpenAI backend.
+Tool calling with open-source models works but requires the correct model + parser combination. Tested configurations:
+- **Qwen3.6-27B + `qwen3_coder`**: Full tool calling (file creation, shell commands) — tested and working
+- **Qwen3-32B + `hermes`**: Full tool calling — tested and working
+- **Qwen3-32B + `qwen3_coder`**: Tool calls emitted as text, not parsed — use `hermes` instead
+- **Qwen3-8B**: Too small for reliable agentic tool calling
+
+See [Responses API Compatibility](#responses-api-compatibility) for the full compatibility table.
 
 ### No Built-in Permission System
 

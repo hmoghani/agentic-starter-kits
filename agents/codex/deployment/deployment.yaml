@@ -5,8 +5,8 @@
 #
 # Prerequisites:
 #   - oc CLI logged into an OpenShift cluster
-#   - A vLLM endpoint serving /v1/responses with tool calling enabled
-#     (non-harmony models only — harmony/gpt-oss models do not support namespace tools)
+#   - Upstream vLLM v0.25.1+ serving /v1/responses with tool calling enabled
+#     (non-harmony models only — tested: Qwen3.6-27B + qwen3_coder, Qwen3-32B + hermes)
 #
 # Usage:
 #   oc new-project <your-namespace>
