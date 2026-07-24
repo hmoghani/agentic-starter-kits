@@ -823,7 +823,7 @@ The entrypoint script (`manifests/entrypoint.sh`) handles:
 | **Runtime** | Inside OpenShell gateway | Standalone pod on OpenShift |
 | **Auth** | OpenShell gateway | OpenShift OAuth proxy |
 | **Use case** | Sandboxed experimentation | Production RHOAI deployment |
-| **Manifests** | N/A (OpenShell manages lifecycle) | `manifests/` in this directory |
+| **Manifests** | Helm chart (OpenShell manages lifecycle) | `manifests/` in this directory |
 
 ---
 

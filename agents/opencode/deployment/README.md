@@ -18,5 +18,6 @@ For the full deployment guide, see the [OpenCode on RHOAI README](../README.md).
 | `Containerfile.a2a` | A2A / Kagenti agent discovery variant |
 | `entrypoint-a2a.sh` | Entrypoint for A2A variant (runs opencode serve + opencode-a2a) |
 | `kagenti-agent.yaml` | OpenShift Template for Kagenti-compatible deployment |
+| `DEPLOYMENT.md` | Legacy deployment guide (content moved to `../README.md`) |
 | `README-a2a.md` | A2A / Kagenti deployment guide |
 | `docs/` | MLflow tracing schema, benchmarks, and screenshots |
