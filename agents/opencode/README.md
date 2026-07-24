@@ -12,8 +12,7 @@ Deploy [OpenCode](https://opencode.ai), an open-source terminal-based coding age
   - [CLI Mode](#cli-mode)
   - [Custom Environment](#custom-environment)
   - [OpenShell Sandbox](#openshell-sandbox)
-- [Configuration](#configuration)
-  - [Model Endpoint](#model-endpoint)
+- [Configuration (Kustomize Deployment)](#configuration-kustomize-deployment)
   - [Small Model](#small-model)
   - [Session Persistence](#session-persistence)
   - [Skills Injection](#skills-injection)
@@ -27,7 +26,7 @@ Deploy [OpenCode](https://opencode.ai), an open-source terminal-based coding age
 - [A2A / Kagenti Discovery](#a2a--kagenti-discovery)
 - [Security](#security)
 - [Architecture](#architecture)
-- [Troubleshooting](#troubleshooting)
+- [Image Reference](#image-reference)
 - [Project Structure](#project-structure)
 - [Related Resources](#related-resources)
 
@@ -68,8 +67,9 @@ The quick start uses a **pre-built image** — no Containerfile or image build i
 | **MLflow tracing** | [`Containerfile.mlflow`](deployment/Containerfile.mlflow) | You need agent execution traces exported to MLflow | Yes |
 | **A2A / Kagenti** | [`Containerfile.a2a`](deployment/Containerfile.a2a) | You want Kagenti agent discovery via the A2A protocol (agent card and discovery available; task execution pending RHAIENG-5826) | Yes |
 | **OpenShell sandbox** | [`Containerfile.openshell`](deployment/Containerfile.openshell) | Sandboxed experimentation inside an OpenShell gateway | Yes |
+| **OpenShell + MLflow** | [`Containerfile.openshell-mlflow`](deployment/Containerfile.openshell-mlflow) | OpenShell sandbox with MLflow tracing support | Yes |
 
-The base image is built from [opendatahub-io/opencode](https://github.com/opendatahub-io/opencode) (UBI 9 minimal, non-root, `restricted-v2` SCC). Each Containerfile extends this base with additional dependencies — they are separate because each variant has different runtime requirements and not all users need every capability.
+The base image is built from [opendatahub-io/opencode](https://github.com/opendatahub-io/opencode) (UBI 9 minimal, non-root, `restricted-v2` SCC). The MLflow and A2A Containerfiles extend this base. The OpenShell variants extend a separate `openshell-base` image. They are separate because each variant has different runtime requirements and not all users need every capability.
 
 ### Building a Variant
 
@@ -84,13 +84,16 @@ podman build --platform linux/amd64 -t opencode-a2a:latest -f Containerfile.a2a 
 
 # OpenShell sandbox
 podman build --platform linux/amd64 -t opencode-sandbox:latest -f Containerfile.openshell .
+
+# OpenShell sandbox with MLflow tracing
+podman build --platform linux/amd64 -t opencode-sandbox-mlflow:latest -f Containerfile.openshell-mlflow .
 ```
 
 ---
 
 ## Deployment Modes
 
-All deployment modes use [Kustomize](https://kustomize.io/) with a shared base and per-mode overlays:
+The web, CLI, and custom environment modes use [Kustomize](https://kustomize.io/) with a shared base and per-mode overlays (the [OpenShell Sandbox](#openshell-sandbox) mode has its own deployment via Helm):
 
 ```text
 deployment/manifests/          # Base: web mode with OAuth proxy
@@ -124,13 +127,13 @@ oc -n opencode exec -it deployment/opencode-web -c opencode-web -- opencode
 
 ```bash
 # List previous sessions
-oc exec deployment/opencode-web -c opencode-web -- opencode session list
+oc exec -n opencode deployment/opencode-web -c opencode-web -- opencode session list
 
 # Resume the most recent session
-oc exec -it deployment/opencode-web -c opencode-web -- opencode --continue
+oc exec -it -n opencode deployment/opencode-web -c opencode-web -- opencode --continue
 
 # Resume a specific session
-oc exec -it deployment/opencode-web -c opencode-web -- opencode --session <session-id>
+oc exec -it -n opencode deployment/opencode-web -c opencode-web -- opencode --session <session-id>
 ```
 
 ### Custom Environment
@@ -424,7 +427,9 @@ Common causes: SCC not granted, image pull failure, or the Sandbox CRD controlle
 
 ---
 
-## Configuration
+## Configuration (Kustomize Deployment)
+
+The settings below apply to the kustomize-based deployment (web and CLI modes). For OpenShell sandbox configuration, see [Step 7](#step-7-configure-opencode-and-test) in the OpenShell section.
 
 | Setting | Where to change | Notes |
 |---------|----------------|-------|
@@ -539,7 +544,7 @@ oc rollout restart deployment/opencode-web
 
 ## MLflow Tracing
 
-Enable MLflow tracing for OpenCode on Red Hat OpenShift AI. Works in both web and CLI modes.
+Enable MLflow tracing for OpenCode on Red Hat OpenShift AI.
 
 For trace schema, backend comparisons, and latency benchmarks, see [deployment/docs/mlflow-tracing.md](deployment/docs/mlflow-tracing.md).
 
@@ -630,15 +635,135 @@ Navigate to your workspace and experiment name to see traces.
 
 ### OpenShell + MLflow Tracing
 
-<!-- TODO(RHAIENG-6261): This section needs cluster testing before it can be completed.
-     Areas to validate:
-     1. OpenShell sandbox egress to MLflow service (network/sandbox policy)
-     2. Environment variable injection for MLFLOW_TRACKING_URI, etc.
-     3. Whether a combined Containerfile.openshell-mlflow is needed
-     4. End-to-end: OpenCode in OpenShell on RHOAI with traces to RHOAI MLflow
--->
+To enable MLflow tracing in an OpenShell sandbox, use [`Containerfile.openshell-mlflow`](deployment/Containerfile.openshell-mlflow) instead of `Containerfile.openshell` when building the sandbox image. It includes Python, the `mlflow` pip package, and a pre-built `@mlflow/opencode` plugin with workspace header and auth fixes.
 
-MLflow tracing for the OpenShell deployment path is being validated. This section will be updated once cluster testing confirms the egress configuration and environment variable injection needed for OpenShell sandboxes to reach an RHOAI MLflow instance. See [RHAIENG-6261](https://redhat.atlassian.net/browse/RHAIENG-6261) for status.
+#### 1. Build and deploy with the MLflow image
+
+Follow the [OpenShell Sandbox](#openshell-sandbox) steps above, but use `Containerfile.openshell-mlflow` in Step 5:
+
+```bash
+cd agents/opencode/deployment
+
+# Use the MLflow Containerfile instead of the base one
+oc delete buildconfig opencode-sandbox -n <your-namespace>
+cat <<'EOF' | oc apply -n <your-namespace> -f -
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: opencode-sandbox
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: opencode-sandbox:latest
+  source:
+    type: Binary
+  strategy:
+    dockerStrategy:
+      dockerfilePath: Containerfile.openshell-mlflow
+    type: Docker
+EOF
+
+oc start-build opencode-sandbox --from-dir=. --follow -n <your-namespace>
+```
+
+Then continue with Steps 6 and 7 as described in the [OpenShell Sandbox](#openshell-sandbox) section.
+
+#### 2. Grant RBAC for MLflow access
+
+The sandbox service account needs the `edit` role so MLflow's auth plugin accepts it. The SA name follows the pattern `<helm-release-name>-sandbox`:
+
+```bash
+oc adm policy add-role-to-user edit -z openshell-sandbox -n <your-namespace>
+```
+
+#### 3. Set up the MLflow plugin, TLS, and experiment
+
+After the sandbox is running and OpenCode is configured ([Step 7](#step-7-configure-opencode-and-test)), run the following setup steps.
+
+**Install the plugin and patch it with the pre-built version** (the published npm package does not include the workspace header fix):
+
+```bash
+oc exec -n <your-namespace> opencode -c agent -- su -s /bin/bash sandbox -c \
+  'HOME=/home/sandbox opencode plugin @mlflow/opencode'
+
+oc exec -n <your-namespace> opencode -c agent -- bash -c '
+CACHED_CORE=$(find /home/sandbox/.cache/opencode/packages/@mlflow/opencode@latest/node_modules/@mlflow/core/dist -type d 2>/dev/null | head -1)
+CACHED_OC=$(find /home/sandbox/.cache/opencode/packages/@mlflow/opencode@latest/node_modules/@mlflow/opencode/dist -type d 2>/dev/null | head -1)
+[ -d "/opt/mlflow-plugin/core/dist" ] && [ -n "$CACHED_CORE" ] && cp -r /opt/mlflow-plugin/core/dist/* "$CACHED_CORE/"
+[ -d "/opt/mlflow-plugin/opencode/dist" ] && [ -n "$CACHED_OC" ] && cp -r /opt/mlflow-plugin/opencode/dist/* "$CACHED_OC/"
+echo "Plugin patched"
+'
+```
+
+**Inject the cluster service CA certificate** (required — OpenCode uses Bun, which does not honor `NODE_TLS_REJECT_UNAUTHORIZED`):
+
+```bash
+oc get configmap/openshift-service-ca.crt -n openshift-config-managed \
+  -o jsonpath='{.data.service-ca\.crt}' | \
+  oc exec -i -n <your-namespace> opencode -c agent -- bash -c 'cat > /tmp/service-ca.crt'
+```
+
+**Generate a service account token and create the MLflow experiment:**
+
+The OpenShell sandbox does not mount a standard Kubernetes SA token. Generate one externally:
+
+```bash
+TOKEN=$(oc create token openshell-sandbox -n <your-namespace> --duration=8h)
+
+oc exec -n <your-namespace> opencode -c agent -- bash -c "
+export MLFLOW_TRACKING_URI='https://mlflow.redhat-ods-applications.svc:8443/mlflow'
+export MLFLOW_TRACKING_TOKEN='$TOKEN'
+export MLFLOW_TRACKING_INSECURE_TLS=true
+export MLFLOW_WORKSPACE='<your-namespace>'
+export MLFLOW_EXPERIMENT_NAME='opencode-openshell-traces'
+
+python3 -c '
+import warnings; warnings.filterwarnings(\"ignore\")
+import os, mlflow
+mlflow.set_tracking_uri(os.environ[\"MLFLOW_TRACKING_URI\"])
+name = os.environ[\"MLFLOW_EXPERIMENT_NAME\"]
+exp = mlflow.get_experiment_by_name(name)
+eid = exp.experiment_id if exp else mlflow.create_experiment(name)
+print(f\"Experiment: {name} (ID: {eid})\")
+'
+"
+```
+
+Note the experiment ID from the output — you'll need it in the next step.
+
+#### 4. Run OpenCode with tracing
+
+Replace `<experiment-id>` with the ID from the previous step:
+
+```bash
+TOKEN=$(oc create token openshell-sandbox -n <your-namespace> --duration=8h)
+
+oc exec -it -n <your-namespace> opencode -c agent -- su -s /bin/bash sandbox -c "
+export HOME=/home/sandbox
+export MLFLOW_TRACKING_URI='https://mlflow.redhat-ods-applications.svc:8443/mlflow'
+export MLFLOW_TRACKING_TOKEN='$TOKEN'
+export MLFLOW_TRACKING_INSECURE_TLS=true
+export MLFLOW_WORKSPACE='<your-namespace>'
+export MLFLOW_EXPERIMENT_ID='<experiment-id>'
+export NODE_EXTRA_CA_CERTS=/tmp/service-ca.crt
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+cd /workspace
+opencode
+"
+```
+
+Chat with OpenCode, then exit (`Ctrl+C`). The `@mlflow/opencode` plugin exports traces when the session ends.
+
+#### 5. View traces
+
+```bash
+oc get consolelink mlflow -o jsonpath='{.spec.href}'
+```
+
+Open the URL, select your workspace (the namespace name), and navigate to the experiment.
+
+> **Token expiry:** The SA token generated with `oc create token` has a limited lifetime (8 hours in the example above). For long-running sandboxes, generate a new token and re-export `MLFLOW_TRACKING_TOKEN` before it expires.
 
 ---
 
@@ -658,10 +783,18 @@ For full A2A deployment instructions, see [deployment/README-a2a.md](deployment/
 
 ## Security
 
+### Kustomize Deployment
+
 - **SCC**: Runs under `restricted-v2` — `runAsNonRoot`, drop all capabilities, seccomp RuntimeDefault. No special SCC grants required.
 - **TLS**: Reencrypt termination end-to-end; serving certificate auto-generated by OpenShift.
 - **RBAC**: OAuth proxy enforces Subject Access Review — users must have `get` on `services` in the deployment namespace.
 - **Secrets**: Inline secrets in `kustomization.yaml` are for convenience only. For production, use Sealed Secrets, External Secrets Operator, or Secrets Store CSI Driver.
+
+### OpenShell Sandbox
+
+- **SCC**: The sandbox pod requires the `privileged` SCC for the OpenShell supervisor (granted to the sandbox SA in [Step 2](#step-2-grant-the-privileged-scc)). The OpenCode process itself runs as the non-root `sandbox` user.
+- **Auth**: The OpenShell gateway handles sandbox authentication via mTLS. No OAuth proxy is used.
+- **Secrets**: Model endpoint credentials are passed via the OpenCode config file written in [Step 7](#step-7-configure-opencode-and-test). For production, consider mounting credentials from a Kubernetes Secret.
 
 ---
 
@@ -694,9 +827,9 @@ The entrypoint script (`manifests/entrypoint.sh`) handles:
 
 ---
 
-## Troubleshooting
+## Image Reference
 
-### Container Image
+### Kustomize Base Image
 
 | Field | Value |
 |-------|-------|
@@ -705,8 +838,6 @@ The entrypoint script (`manifests/entrypoint.sh`) handles:
 | Base | UBI 9 minimal |
 | License | MIT (OpenCode), Apache 2.0 (deployment manifests) |
 
-### What the Image Contains
-
 | Layer | Purpose |
 |-------|---------|
 | UBI 9 minimal | RHEL-compatible base |
@@ -714,12 +845,19 @@ The entrypoint script (`manifests/entrypoint.sh`) handles:
 | git, jq, make, vim-minimal, diffutils, findutils, openssh-clients, patch, procps-ng, tar, gzip, which | CLI tools for development workflows |
 | Python 3 + [uv](https://github.com/astral-sh/uv) | Python environment and package manager |
 
-### Version Pinning Strategy
+### OpenShell Sandbox Image
+
+| Field | Value |
+|-------|-------|
+| Base | `quay.io/hmoghani/openshell-base:latest` |
+| OpenCode version | npm `opencode-ai@1.17.1` |
+| MLflow variant | Adds Python 3, `mlflow[kubernetes]==3.14.*`, pre-built `@mlflow/opencode` plugin |
+
+### Version Pinning
 
 - **OpenCode**: pinned to a tagged release in the Containerfile `ARG`. Upgrades require a new image build and manifest update.
-- **Go runtime**: build-time only; not present in the final image (multi-stage build).
-- **Base image**: `registry.access.redhat.com/ubi9/ubi-minimal`, pulled at build time. Pin to a specific tag for reproducible builds.
-- **Image tag in manifests**: pin to a specific tag or digest in production. Avoid `:latest`.
+- **Base image**: pin to a specific tag for reproducible builds. Avoid `:latest` in production.
+- **Image tag in manifests**: pin to a specific tag or digest in production.
 
 ---
 
@@ -748,6 +886,7 @@ agents/opencode/
     │   ├── example/                  # Template for custom environments
     │   └── mlflow-tracing/           # MLflow tracing overlay
     ├── Containerfile.openshell       # OpenShell sandbox variant
+    ├── Containerfile.openshell-mlflow  # OpenShell sandbox + MLflow tracing variant
     ├── Containerfile.mlflow          # MLflow tracing image variant
     ├── Containerfile.a2a             # A2A / Kagenti agent discovery variant
     ├── entrypoint-a2a.sh             # Entrypoint for A2A variant

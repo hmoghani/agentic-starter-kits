@@ -1,0 +1,47 @@
+# OpenCode agent for OpenShell sandbox with MLflow tracing
+#
+# Extends the OpenShell sandbox image with Python and MLflow so that
+# tracing works out of the box — no runtime installs needed.
+#
+# Build:
+#   podman build --platform linux/amd64 -t opencode-sandbox-mlflow:latest -f Containerfile.openshell-mlflow .
+
+FROM quay.io/hmoghani/openshell-base:latest
+
+USER 0
+
+# Node.js runtime (from UBI repos)
+RUN microdnf install -y --nodocs nodejs npm && \
+    microdnf clean all && \
+    rm -rf /var/cache/yum
+
+# Install OpenCode (MIT)
+ARG OPENCODE_VERSION=1.17.1
+RUN npm install -g opencode-ai@${OPENCODE_VERSION}
+
+# Python + MLflow for experiment creation and SA token auth
+RUN microdnf install -y --nodocs python3 python3-pip && \
+    microdnf clean all && \
+    rm -rf /var/cache/yum
+RUN pip3 install --no-cache-dir 'mlflow[kubernetes]==3.14.*'
+
+# Build @mlflow/core and @mlflow/opencode from v3.14.0.
+# The published npm packages (@mlflow/opencode v0.3.0) do not include the
+# workspace header and auth token fixes. Building from the release tag
+# includes them. The pre-built files are staged at /opt/mlflow-plugin/ and
+# copied over the npm-cached versions when the plugin is installed.
+RUN git clone --depth 1 --branch v3.14.0 https://github.com/mlflow/mlflow.git /tmp/mlflow \
+    && cd /tmp/mlflow/libs/typescript && npm install && npm run build \
+    && mkdir -p /opt/mlflow-plugin/core /opt/mlflow-plugin/opencode \
+    && cp -r /tmp/mlflow/libs/typescript/core/dist /opt/mlflow-plugin/core/ \
+    && cp /tmp/mlflow/libs/typescript/core/package.json /opt/mlflow-plugin/core/ \
+    && cp -r /tmp/mlflow/libs/typescript/integrations/opencode/dist /opt/mlflow-plugin/opencode/ \
+    && cp /tmp/mlflow/libs/typescript/integrations/opencode/package.json /opt/mlflow-plugin/opencode/ \
+    && rm -rf /tmp/mlflow
+
+# Verify
+RUN opencode --version && python3 -c "import mlflow; print(f'mlflow {mlflow.__version__}')"
+
+USER 1001
+WORKDIR /workspace
+ENV AGENT_NAME=opencode

@@ -13,7 +13,8 @@ For the full deployment guide, see the [OpenCode on RHOAI README](../README.md).
 | `overlays/example/` | Template for custom environments |
 | `overlays/mlflow-tracing/` | MLflow tracing overlay |
 | `Containerfile.openshell` | OpenShell sandbox image variant |
-| `Containerfile.mlflow` | MLflow tracing image variant |
+| `Containerfile.openshell-mlflow` | OpenShell sandbox + MLflow tracing variant |
+| `Containerfile.mlflow` | MLflow tracing image variant (kustomize deployment) |
 | `Containerfile.a2a` | A2A / Kagenti agent discovery variant |
 | `entrypoint-a2a.sh` | Entrypoint for A2A variant (runs opencode serve + opencode-a2a) |
 | `kagenti-agent.yaml` | OpenShift Template for Kagenti-compatible deployment |
