@@ -143,54 +143,284 @@ oc apply -k deployment/overlays/my-env
 
 ### OpenShell Sandbox
 
-Run OpenCode inside an [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) sandbox with policy-enforced network isolation.
+[NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) is an open-source sandbox runtime for AI agents. It runs containers inside a policy-enforced isolation boundary with controlled network egress and filesystem constraints — think of it as a lightweight VM alternative where the OpenShell supervisor intercepts all I/O and enforces security policies.
+
+This section walks through installing an OpenShell gateway on OpenShift via Helm, building the OpenCode sandbox image, creating a sandbox, and running OpenCode against a vLLM model endpoint.
+
+> Tested on: OpenShell gateway v0.0.86, CLI v0.0.58, OpenShift 4.21 (July 2026), OpenCode 1.17.1.
+
+#### What you'll set up
+
+```text
+┌─ Your namespace ──────────────────────────────────────────────┐
+│                                                               │
+│  openshell-0 (gateway)         opencode (sandbox pod)         │
+│  ┌─────────────────────┐       ┌─────────────────────────┐   │
+│  │ Manages sandbox      │──────▶│ OpenShell supervisor     │   │
+│  │ lifecycle, auth,     │       │ (PID 1, runs as root)   │   │
+│  │ policy enforcement   │       │                         │   │
+│  └─────────────────────┘       │ OpenCode (user sandbox)  │   │
+│                                 │ ┌─────────────────────┐ │   │
+│                                 │ │ npm opencode-ai      │ │   │
+│                                 │ │ connects to vLLM     │─┼───┼──▶ vLLM endpoint
+│                                 │ └─────────────────────┘ │   │
+│                                 └─────────────────────────┘   │
+└───────────────────────────────────────────────────────────────┘
+```
 
 #### Prerequisites
 
-- [Podman](https://podman.io/) or Docker installed
-- [OpenShell CLI](https://github.com/NVIDIA/OpenShell-Community) installed and connected to a gateway
-- An OGX-compatible inference endpoint reachable from the sandbox
+- OpenShift 4.17+ cluster with `oc` CLI authenticated
+- [Helm](https://helm.sh/) 3+ installed locally
+- [OpenShell CLI](https://docs.nvidia.com/openshell/latest/installation) installed locally (`openshell --version` should print `0.0.58` or later)
+- The Kubernetes Agent Sandbox CRD must be installed on the cluster. Verify with `oc get crd sandboxes.agents.x-k8s.io`. If not installed, follow the [Red Hat build of Agent Sandbox](https://docs.redhat.com/en/documentation/red_hat_build_of_agent_sandbox) instructions or the [upstream k8s sandbox operator](https://github.com/kubernetes-sigs/agent-sandbox) installation
+- A vLLM model serving endpoint reachable from within the cluster
 
-#### Build
+#### Step 1: Create a namespace
+
+```bash
+oc new-project <your-namespace>
+```
+
+All subsequent commands assume you are working in this namespace.
+
+#### Step 2: Grant the privileged SCC
+
+The OpenShell sandbox service account needs the `privileged` SCC. The Helm chart creates the service account with the name `<release-name>-sandbox` — since we'll use `openshell` as the release name, the SA will be `openshell-sandbox`:
+
+```bash
+oc adm policy add-scc-to-user privileged -z openshell-sandbox -n <your-namespace>
+```
+
+> **Important:** This must be done **before** installing the Helm chart. If the SCC binding is missing, sandbox pods will fail with `unable to validate against any security context constraint`.
+
+#### Step 3: Install the OpenShell gateway via Helm
+
+```bash
+helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
+  --version 0.0.86 \
+  --namespace <your-namespace> \
+  --set podSecurityContext.fsGroup=null \
+  --set securityContext.runAsUser=null \
+  --set server.auth.allowUnauthenticatedUsers=true
+```
+
+> **Shared clusters:** If the cluster already has an OpenShell installation in another namespace, the Helm install may fail with a `ClusterRole "openshell-node-reader" already exists` error. Add `--set nodeReader.enabled=false` to skip creating the cluster-scoped resource.
+
+Wait for the gateway to be ready:
+
+```bash
+oc rollout status statefulset/openshell -n <your-namespace> --timeout=120s
+```
+
+#### Step 4: Connect the OpenShell CLI
+
+The Helm chart auto-generates mTLS certificates for secure gateway communication. Extract them to your local machine:
+
+```bash
+mkdir -p ~/.config/openshell/gateways/openshift/mtls
+
+oc -n <your-namespace> get secret openshell-client-tls \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d > ~/.config/openshell/gateways/openshift/mtls/ca.crt
+
+oc -n <your-namespace> get secret openshell-client-tls \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d > ~/.config/openshell/gateways/openshift/mtls/tls.crt
+
+oc -n <your-namespace> get secret openshell-client-tls \
+  -o jsonpath='{.data.tls\.key}' | base64 -d > ~/.config/openshell/gateways/openshift/mtls/tls.key
+```
+
+Start a port-forward and register the gateway:
+
+```bash
+oc port-forward svc/openshell 8080:8080 -n <your-namespace> &
+
+openshell gateway add https://127.0.0.1:8080 --local --name openshift
+```
+
+Verify the connection:
+
+```bash
+openshell status
+```
+
+Expected output:
+
+```text
+Server Status
+
+  Gateway: openshift
+  Server: https://127.0.0.1:8080
+  Status: Connected
+  Version: 0.0.86
+```
+
+#### Step 5: Build the OpenCode sandbox image
+
+The image must be built inside the cluster so the internal registry can serve it to sandbox pods:
 
 ```bash
 cd agents/opencode/deployment
 
-podman build --platform linux/amd64 -t opencode-sandbox:latest -f Containerfile.openshell .
+oc create imagestream opencode-sandbox -n <your-namespace>
+
+cat <<'EOF' | oc apply -n <your-namespace> -f -
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: opencode-sandbox
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: opencode-sandbox:latest
+  source:
+    type: Binary
+  strategy:
+    dockerStrategy:
+      dockerfilePath: Containerfile.openshell
+    type: Docker
+EOF
+
+oc start-build opencode-sandbox --from-dir=. --follow -n <your-namespace>
 ```
 
-Build with `--platform linux/amd64` when targeting x86_64 clusters from Apple Silicon machines.
-
-#### Run
-
-OpenShell's sandbox supervisor replaces the image's CMD/ENTRYPOINT at runtime. Start OpenCode manually inside the sandbox:
+#### Step 6: Create a sandbox
 
 ```bash
 openshell sandbox create \
   --name opencode \
-  --from opencode-sandbox:latest
+  --from image-registry.openshift-image-registry.svc:5000/<your-namespace>/opencode-sandbox:latest \
+  -- sleep infinity
 ```
 
-> **Note:** OpenShell's supervisor takes over as PID 1 and does not automatically run OpenCode. Start it manually inside the sandbox.
+The CLI may show a supervisor relay timeout during creation — this is a timing issue and can be ignored. Verify the sandbox reached `Ready` state:
 
-#### OpenShell on RHOAI
+```bash
+openshell sandbox list
+```
 
-<!-- TODO(RHAIENG-6261): This section needs cluster testing before it can be completed.
-     The following areas need to be validated:
-     1. Registering the OpenShell image with an RHOAI-hosted OpenShell gateway
-     2. Passing model endpoint env vars into the sandbox
-     3. Network/egress configuration for reaching vLLM/OGX endpoints
-     4. Whether Containerfile.openshell works as-is on RHOAI
+Expected output:
 
-     Reference materials:
-     - "OpenShell on OpenShift with mTLS" deployment guide (see RHAIENG-6261 Jira comments)
-     - NVIDIA OpenShell GitHub: https://github.com/NVIDIA/OpenShell
-     - ADK OpenShell guide: agents/google/templates/adk/OPENSHELL.md
--->
+```text
+NAME      CREATED              PHASE
+opencode  2026-07-24 18:45:00  Ready
+```
 
-Deploying OpenCode in OpenShell **on an RHOAI cluster** is being validated. This section will be updated with verified steps once cluster testing is complete. See [RHAIENG-6261](https://redhat.atlassian.net/browse/RHAIENG-6261) for status.
+#### Step 7: Configure OpenCode and test
 
-Tested on: OpenShell v0.0.58, OpenShift 4.21 (June 2026). OpenCode version 1.17.1.
+The sandbox supervisor runs as root (PID 1). OpenCode runs as the `sandbox` user. You need to prepare the home directory, write the OpenCode provider config, and initialize a git workspace.
+
+Replace `<vllm-service>`, `<vllm-namespace>`, and `<model-name>` with your vLLM endpoint details:
+
+```bash
+oc exec -n <your-namespace> opencode -c agent -- /bin/bash -c '
+# Determine the sandbox user UID (assigned by OpenShift namespace range)
+SANDBOX_UID=$(id -u sandbox 2>/dev/null || id -g sandbox)
+
+# Prepare home directory
+mkdir -p /home/sandbox/.local /home/sandbox/.cache /home/sandbox/.config/opencode
+chown -R $SANDBOX_UID:$SANDBOX_UID /home/sandbox
+
+# Write OpenCode provider configuration
+cat > /home/sandbox/.config/opencode/opencode.json << '\''CONF'\''
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "vllm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "vLLM",
+      "options": {
+        "baseURL": "http://<vllm-service>.<vllm-namespace>.svc.cluster.local/v1",
+        "apiKey": "token"
+      },
+      "models": {
+        "<model-name>": {
+          "name": "<model-name>"
+        }
+      }
+    }
+  },
+  "model": "vllm/<model-name>",
+  "small_model": "vllm/<model-name>",
+  "enabled_providers": ["vllm"]
+}
+CONF
+chown $SANDBOX_UID:$SANDBOX_UID /home/sandbox/.config/opencode/opencode.json
+
+# Initialize git workspace (OpenCode requires a git repo)
+cd /workspace
+git init
+git config user.email "opencode@openshift.local"
+git config user.name "OpenCode"
+chown -R $SANDBOX_UID:$SANDBOX_UID /workspace
+echo "Setup complete"
+'
+```
+
+Test that OpenCode can reach the model:
+
+```bash
+oc exec -n <your-namespace> opencode -c agent -- su -s /bin/bash sandbox -c \
+  'cd /workspace && HOME=/home/sandbox opencode run "What is 2+2? Reply with just the number."'
+```
+
+Expected output:
+
+```text
+> build · <model-name>
+
+4
+```
+
+To start an interactive session:
+
+```bash
+oc exec -it -n <your-namespace> opencode -c agent -- su -s /bin/bash sandbox -c \
+  'cd /workspace && HOME=/home/sandbox opencode'
+```
+
+#### Cleanup
+
+```bash
+# Delete the sandbox
+openshell sandbox delete opencode
+
+# Uninstall the OpenShell gateway
+helm uninstall openshell -n <your-namespace>
+
+# Clean up the SCC binding
+oc adm policy remove-scc-from-user privileged -z openshell-sandbox -n <your-namespace>
+
+# Delete build resources
+oc delete buildconfig opencode-sandbox -n <your-namespace>
+oc delete imagestream opencode-sandbox -n <your-namespace>
+
+# Delete the namespace (removes everything)
+oc delete project <your-namespace>
+```
+
+#### Troubleshooting
+
+**Sandbox pod fails with SCC error:** The `openshell-sandbox` service account needs the `privileged` SCC. Run the SCC binding command from Step 2. The SCC must be granted **before** creating the sandbox.
+
+**Sandbox stuck in `Provisioning`:** Check the sandbox status for errors:
+
+```bash
+oc get sandbox opencode -n <your-namespace> -o yaml | grep -A5 conditions
+```
+
+Common causes: SCC not granted, image pull failure, or the Sandbox CRD controller not running.
+
+**`EACCES: permission denied, mkdir '/home/sandbox/.local'`:** The sandbox user UID is assigned by OpenShift's namespace UID range (not a fixed 1001). You must create and `chown` the home directory before running OpenCode (Step 7).
+
+**OpenCode errors with `not in a git directory`:** OpenCode requires a git repository in the working directory. Run `git init` in `/workspace` (Step 7).
+
+**Helm install fails with `ClusterRole already exists`:** Another OpenShell installation on the cluster already created the `openshell-node-reader` ClusterRole. Add `--set nodeReader.enabled=false` to the Helm install command.
+
+**CLI shows `supervisor relay failed` during sandbox creation:** This is a timing issue — the CLI tries to SSH before the supervisor is fully connected. Check `openshell sandbox list` — if the sandbox shows `Ready`, it is working.
+
+**Image pull errors:** The sandbox image must be in the cluster's internal registry. Build it via `oc start-build` (Step 5), not with local `podman build`.
 
 ---
 
