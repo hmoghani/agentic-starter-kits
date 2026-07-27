@@ -175,8 +175,8 @@ This section walks through installing an OpenShell gateway on OpenShift via Helm
 
 - OpenShift 4.17+ cluster with `oc` CLI authenticated
 - [Helm](https://helm.sh/) 3+ installed locally
-- [OpenShell CLI](https://docs.nvidia.com/openshell/latest/installation) installed locally (`openshell --version` should print `0.0.58` or later)
-- The Kubernetes Agent Sandbox CRD must be installed on the cluster. Verify with `oc get crd sandboxes.agents.x-k8s.io`. If not installed, follow the [Red Hat build of Agent Sandbox](https://docs.redhat.com/en/documentation/red_hat_build_of_agent_sandbox) instructions or the [upstream k8s sandbox operator](https://github.com/kubernetes-sigs/agent-sandbox) installation
+- [OpenShell CLI](https://docs.nvidia.com/openshell/get-started/quickstart) installed locally (`openshell --version` should print `0.0.58` or later)
+- The Kubernetes Agent Sandbox CRD must be installed on the cluster. Verify with `oc get crd sandboxes.agents.x-k8s.io`. If not installed, follow the [upstream k8s sandbox operator](https://github.com/kubernetes-sigs/agent-sandbox) installation instructions
 - A vLLM model serving endpoint reachable from within the cluster
 
 #### Step 1: Create a namespace
@@ -778,6 +778,7 @@ Open the URL, select your workspace (the namespace name), and navigate to the ex
 OpenCode can be deployed as a Kagenti-discoverable agent using the Agent-to-Agent (A2A) protocol. This enables service discovery via the Kagenti agent catalog.
 
 **Current state:**
+
 - Agent card server is implemented and running
 - Agent discovery works in Kagenti UI
 - Health checks are proxied
