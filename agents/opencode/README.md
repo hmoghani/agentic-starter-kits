@@ -446,7 +446,7 @@ openshell policy update opencode \
   --wait
 ```
 
-See the [OpenShell policy documentation](https://docs.nvidia.com/openshell/latest/reference/sandbox-policy) for details on egress rules.
+See the [OpenShell policy documentation](https://docs.nvidia.com/openshell/reference/default-policy) for details on egress rules.
 
 ---
 
