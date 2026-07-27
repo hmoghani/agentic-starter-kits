@@ -718,7 +718,7 @@ The OpenShell sandbox does not mount a standard Kubernetes SA token. Generate on
 TOKEN=$(oc create token ${OPENSHELL_NAME}-sandbox -n <your-namespace> --duration=8h)
 
 oc exec -n <your-namespace> opencode -c agent -- bash -c "
-export MLFLOW_TRACKING_URI='https://mlflow.redhat-ods-applications.svc:8443/mlflow'
+export MLFLOW_TRACKING_URI='https://mlflow.<rhoai-namespace>.svc:8443/mlflow'
 export MLFLOW_TRACKING_TOKEN='$TOKEN'
 export MLFLOW_TRACKING_INSECURE_TLS=true
 export MLFLOW_WORKSPACE='<your-namespace>'
@@ -747,7 +747,7 @@ TOKEN=$(oc create token ${OPENSHELL_NAME}-sandbox -n <your-namespace> --duration
 
 oc exec -it -n <your-namespace> opencode -c agent -- su -s /bin/bash sandbox -c "
 export HOME=/home/sandbox
-export MLFLOW_TRACKING_URI='https://mlflow.redhat-ods-applications.svc:8443/mlflow'
+export MLFLOW_TRACKING_URI='https://mlflow.<rhoai-namespace>.svc:8443/mlflow'
 export MLFLOW_TRACKING_TOKEN='$TOKEN'
 export MLFLOW_TRACKING_INSECURE_TLS=true
 export MLFLOW_WORKSPACE='<your-namespace>'
