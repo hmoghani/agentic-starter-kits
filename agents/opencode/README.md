@@ -139,9 +139,11 @@ oc exec -it -n opencode deployment/opencode-web -c opencode-web -- opencode --se
 ### Custom Environment
 
 ```bash
-cp -r deployment/overlays/example deployment/overlays/my-env
+cd agents/opencode/deployment
+
+cp -r overlays/example overlays/my-env
 # Edit overlays/my-env/kustomization.yaml — namespace, model, storage class
-oc apply -k deployment/overlays/my-env
+oc apply -k overlays/my-env
 ```
 
 ### OpenShell Sandbox
@@ -189,6 +191,12 @@ All subsequent commands assume you are working in this namespace.
 
 #### Step 2: Install the OpenShell gateway via Helm
 
+The remaining steps reference resources by name using the variable `OPENSHELL_NAME`. Set it before proceeding:
+
+```bash
+export OPENSHELL_NAME=openshell
+```
+
 ```bash
 helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
   --version 0.0.86 \
@@ -198,12 +206,10 @@ helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
   --set server.auth.allowUnauthenticatedUsers=true
 ```
 
-> **Shared clusters:** If the cluster already has an OpenShell installation in another namespace, the Helm install will fail with a `ClusterRole "openshell-node-reader" already exists` error. Add `--set fullnameOverride=openshell-<your-namespace>` to scope all resource names to your namespace. This changes the service account, service, and statefulset names — the remaining steps use the variable `OPENSHELL_NAME` to account for this:
+> **Shared clusters:** If the cluster already has an OpenShell installation in another namespace, the Helm install will fail with a `ClusterRole "openshell-node-reader" already exists` error. Add `--set fullnameOverride=openshell-<your-namespace>` to the command above, then update the variable to match:
 >
 > ```bash
-> # Set this once — use "openshell" if you didn't need fullnameOverride,
-> # or "openshell-<your-namespace>" if you did
-> export OPENSHELL_NAME=openshell
+> export OPENSHELL_NAME=openshell-<your-namespace>
 > ```
 
 Wait for the gateway to be ready:
@@ -227,7 +233,7 @@ oc adm policy add-scc-to-user privileged -z ${OPENSHELL_NAME}-sandbox -n <your-n
 The Helm chart auto-generates mTLS certificates for secure gateway communication. Extract them to your local machine:
 
 ```bash
-mkdir -p ~/.config/openshell/gateways/openshift/mtls
+(umask 077 && mkdir -p ~/.config/openshell/gateways/openshift/mtls)
 
 oc -n <your-namespace> get secret openshell-client-tls \
   -o jsonpath='{.data.ca\.crt}' | base64 -d > ~/.config/openshell/gateways/openshift/mtls/ca.crt
@@ -235,8 +241,8 @@ oc -n <your-namespace> get secret openshell-client-tls \
 oc -n <your-namespace> get secret openshell-client-tls \
   -o jsonpath='{.data.tls\.crt}' | base64 -d > ~/.config/openshell/gateways/openshift/mtls/tls.crt
 
-oc -n <your-namespace> get secret openshell-client-tls \
-  -o jsonpath='{.data.tls\.key}' | base64 -d > ~/.config/openshell/gateways/openshift/mtls/tls.key
+(umask 077 && oc -n <your-namespace> get secret openshell-client-tls \
+  -o jsonpath='{.data.tls\.key}' | base64 -d > ~/.config/openshell/gateways/openshift/mtls/tls.key)
 ```
 
 Start a port-forward and register the gateway:
@@ -671,6 +677,12 @@ spec:
 EOF
 
 oc start-build opencode-sandbox --from-dir=. --follow -n <your-namespace>
+```
+
+If a sandbox already exists from the base image, delete it first so it picks up the new image:
+
+```bash
+openshell sandbox delete opencode
 ```
 
 Then continue with Steps 6 and 7 as described in the [OpenShell Sandbox](#openshell-sandbox) section.
