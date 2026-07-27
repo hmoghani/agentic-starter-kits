@@ -437,6 +437,17 @@ Common causes: SCC not granted, image pull failure, or the Sandbox CRD controlle
 
 **Image pull errors:** The sandbox image must be in the cluster's internal registry. Build it via `oc start-build` (Step 5), not with local `podman build`.
 
+**OpenCode cannot reach the model endpoint or MLflow:** OpenShell sandboxes may enforce network egress policies that block outbound traffic by default. If OpenCode fails to connect to vLLM or MLflow, update the sandbox policy to allow the required endpoints:
+
+```bash
+openshell policy update opencode \
+  --add-endpoint <vllm-service>.<vllm-namespace>.svc.cluster.local:<port>:read-only:rest:enforce \
+  --add-endpoint <mlflow-service>.<rhoai-namespace>.svc.cluster.local:<port>:read-only:rest:enforce \
+  --wait
+```
+
+See the [OpenShell policy documentation](https://docs.nvidia.com/openshell/latest/reference/sandbox-policy) for details on egress rules.
+
 ---
 
 ## Configuration (Kustomize Deployment)
