@@ -6,23 +6,21 @@
 # Build:
 #   podman build --platform linux/amd64 -t opencode-sandbox-mlflow:latest -f Containerfile.openshell-mlflow .
 
-FROM quay.io/hmoghani/openshell-base:latest
+FROM quay.io/aipcc/agentic-ci/openshell:0.3.27
 
 USER 0
 
-# Node.js runtime (from UBI repos)
-RUN microdnf install -y --nodocs nodejs npm && \
-    microdnf clean all && \
-    rm -rf /var/cache/yum
+# Node.js runtime
+RUN dnf install -y --nodocs nodejs npm && \
+    dnf clean all
 
 # Install OpenCode (MIT)
 ARG OPENCODE_VERSION=1.17.1
 RUN npm install -g opencode-ai@${OPENCODE_VERSION}
 
 # Python + MLflow for experiment creation and SA token auth
-RUN microdnf install -y --nodocs python3 python3-pip && \
-    microdnf clean all && \
-    rm -rf /var/cache/yum
+RUN dnf install -y --nodocs python3 python3-pip && \
+    dnf clean all
 RUN pip3 install --no-cache-dir 'mlflow[kubernetes]==3.14.*'
 
 # Build @mlflow/core and @mlflow/opencode from v3.14.0.

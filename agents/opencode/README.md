@@ -69,7 +69,7 @@ The quick start uses a **pre-built image** — no Containerfile or image build i
 | **OpenShell sandbox** | [`Containerfile.openshell`](deployment/Containerfile.openshell) | Sandboxed experimentation inside an OpenShell gateway | Yes |
 | **OpenShell + MLflow** | [`Containerfile.openshell-mlflow`](deployment/Containerfile.openshell-mlflow) | OpenShell sandbox with MLflow tracing support | Yes |
 
-The base image is built from [opendatahub-io/opencode](https://github.com/opendatahub-io/opencode) (UBI 9 minimal, non-root, `restricted-v2` SCC). The MLflow and A2A Containerfiles extend this base. The OpenShell variants extend a separate `openshell-base` image. They are separate because each variant has different runtime requirements and not all users need every capability.
+The base image is built from [opendatahub-io/opencode](https://github.com/opendatahub-io/opencode) (UBI 9 minimal, non-root, `restricted-v2` SCC). The MLflow and A2A Containerfiles extend this base. The OpenShell variants extend a separate OpenShell base image (`quay.io/aipcc/agentic-ci/openshell`). They are separate because each variant has different runtime requirements and not all users need every capability.
 
 ### Building a Variant
 
@@ -838,7 +838,7 @@ The entrypoint script (`manifests/entrypoint.sh`) handles:
 
 | | OpenShell sandbox | Kustomize deployment |
 |--|-------------------|---------------------|
-| **Image** | `openshell-base` + npm flavor | `odh-opencode-rhel9` (Go binary) |
+| **Image** | `aipcc/agentic-ci/openshell` + npm flavor | `odh-opencode-rhel9` (Go binary) |
 | **Runtime** | Inside OpenShell gateway | Standalone pod on OpenShift |
 | **Auth** | OpenShell gateway | OpenShift OAuth proxy |
 | **Use case** | Sandboxed experimentation | Production RHOAI deployment |
@@ -868,7 +868,7 @@ The entrypoint script (`manifests/entrypoint.sh`) handles:
 
 | Field | Value |
 |-------|-------|
-| Base | `quay.io/hmoghani/openshell-base:latest` |
+| Base | `quay.io/aipcc/agentic-ci/openshell:0.3.27` |
 | OpenCode version | npm `opencode-ai@1.17.1` |
 | MLflow variant | Adds Python 3, `mlflow[kubernetes]==3.14.*`, pre-built `@mlflow/opencode` plugin |
 
