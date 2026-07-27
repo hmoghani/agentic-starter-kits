@@ -187,17 +187,7 @@ oc new-project <your-namespace>
 
 All subsequent commands assume you are working in this namespace.
 
-#### Step 2: Grant the privileged SCC
-
-The OpenShell sandbox service account needs the `privileged` SCC. The Helm chart creates the service account with the name `<release-name>-sandbox` — since we'll use `openshell` as the release name, the SA will be `openshell-sandbox`:
-
-```bash
-oc adm policy add-scc-to-user privileged -z openshell-sandbox -n <your-namespace>
-```
-
-> **Important:** This must be done **before** installing the Helm chart. If the SCC binding is missing, sandbox pods will fail with `unable to validate against any security context constraint`.
-
-#### Step 3: Install the OpenShell gateway via Helm
+#### Step 2: Install the OpenShell gateway via Helm
 
 ```bash
 helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
@@ -208,13 +198,29 @@ helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
   --set server.auth.allowUnauthenticatedUsers=true
 ```
 
-> **Shared clusters:** If the cluster already has an OpenShell installation in another namespace, the Helm install may fail with a `ClusterRole "openshell-node-reader" already exists` error. Add `--set nodeReader.enabled=false` to skip creating the cluster-scoped resource.
+> **Shared clusters:** If the cluster already has an OpenShell installation in another namespace, the Helm install will fail with a `ClusterRole "openshell-node-reader" already exists` error. Add `--set fullnameOverride=openshell-<your-namespace>` to scope all resource names to your namespace. This changes the service account, service, and statefulset names — the remaining steps use the variable `OPENSHELL_NAME` to account for this:
+>
+> ```bash
+> # Set this once — use "openshell" if you didn't need fullnameOverride,
+> # or "openshell-<your-namespace>" if you did
+> export OPENSHELL_NAME=openshell
+> ```
 
 Wait for the gateway to be ready:
 
 ```bash
-oc rollout status statefulset/openshell -n <your-namespace> --timeout=120s
+oc rollout status statefulset/$OPENSHELL_NAME -n <your-namespace> --timeout=120s
 ```
+
+#### Step 3: Grant the privileged SCC
+
+The OpenShell sandbox service account needs the `privileged` SCC. The Helm chart creates the service account with the name `${OPENSHELL_NAME}-sandbox`:
+
+```bash
+oc adm policy add-scc-to-user privileged -z ${OPENSHELL_NAME}-sandbox -n <your-namespace>
+```
+
+> **Important:** If the SCC binding is missing, sandbox pods will fail with `unable to validate against any security context constraint`.
 
 #### Step 4: Connect the OpenShell CLI
 
@@ -236,7 +242,7 @@ oc -n <your-namespace> get secret openshell-client-tls \
 Start a port-forward and register the gateway:
 
 ```bash
-oc port-forward svc/openshell 8080:8080 -n <your-namespace> &
+oc port-forward svc/$OPENSHELL_NAME 8080:8080 -n <your-namespace> &
 
 openshell gateway add https://127.0.0.1:8080 --local --name openshift
 ```
@@ -393,7 +399,7 @@ openshell sandbox delete opencode
 helm uninstall openshell -n <your-namespace>
 
 # Clean up the SCC binding
-oc adm policy remove-scc-from-user privileged -z openshell-sandbox -n <your-namespace>
+oc adm policy remove-scc-from-user privileged -z ${OPENSHELL_NAME}-sandbox -n <your-namespace>
 
 # Delete build resources
 oc delete buildconfig opencode-sandbox -n <your-namespace>
@@ -405,7 +411,7 @@ oc delete project <your-namespace>
 
 #### Troubleshooting
 
-**Sandbox pod fails with SCC error:** The `openshell-sandbox` service account needs the `privileged` SCC. Run the SCC binding command from Step 2. The SCC must be granted **before** creating the sandbox.
+**Sandbox pod fails with SCC error:** The `${OPENSHELL_NAME}-sandbox` service account needs the `privileged` SCC. Run the SCC binding command from Step 3.
 
 **Sandbox stuck in `Provisioning`:** Check the sandbox status for errors:
 
@@ -671,10 +677,10 @@ Then continue with Steps 6 and 7 as described in the [OpenShell Sandbox](#opensh
 
 #### 2. Grant RBAC for MLflow access
 
-The sandbox service account needs the `edit` role so MLflow's auth plugin accepts it. The SA name follows the pattern `<helm-release-name>-sandbox`:
+The sandbox service account needs the `edit` role so MLflow's auth plugin accepts it:
 
 ```bash
-oc adm policy add-role-to-user edit -z openshell-sandbox -n <your-namespace>
+oc adm policy add-role-to-user edit -z ${OPENSHELL_NAME}-sandbox -n <your-namespace>
 ```
 
 #### 3. Set up the MLflow plugin, TLS, and experiment
@@ -709,7 +715,7 @@ oc get configmap/openshift-service-ca.crt -n openshift-config-managed \
 The OpenShell sandbox does not mount a standard Kubernetes SA token. Generate one externally:
 
 ```bash
-TOKEN=$(oc create token openshell-sandbox -n <your-namespace> --duration=8h)
+TOKEN=$(oc create token ${OPENSHELL_NAME}-sandbox -n <your-namespace> --duration=8h)
 
 oc exec -n <your-namespace> opencode -c agent -- bash -c "
 export MLFLOW_TRACKING_URI='https://mlflow.redhat-ods-applications.svc:8443/mlflow'
@@ -737,7 +743,7 @@ Note the experiment ID from the output — you'll need it in the next step.
 Replace `<experiment-id>` with the ID from the previous step:
 
 ```bash
-TOKEN=$(oc create token openshell-sandbox -n <your-namespace> --duration=8h)
+TOKEN=$(oc create token ${OPENSHELL_NAME}-sandbox -n <your-namespace> --duration=8h)
 
 oc exec -it -n <your-namespace> opencode -c agent -- su -s /bin/bash sandbox -c "
 export HOME=/home/sandbox
@@ -792,7 +798,7 @@ For full A2A deployment instructions, see [deployment/README-a2a.md](deployment/
 
 ### OpenShell Sandbox
 
-- **SCC**: The sandbox pod requires the `privileged` SCC for the OpenShell supervisor (granted to the sandbox SA in [Step 2](#step-2-grant-the-privileged-scc)). The OpenCode process itself runs as the non-root `sandbox` user.
+- **SCC**: The sandbox pod requires the `privileged` SCC for the OpenShell supervisor (granted to the sandbox SA in [Step 3](#step-3-grant-the-privileged-scc)). The OpenCode process itself runs as the non-root `sandbox` user.
 - **Auth**: The OpenShell gateway handles sandbox authentication via mTLS. No OAuth proxy is used.
 - **Secrets**: Model endpoint credentials are passed via the OpenCode config file written in [Step 7](#step-7-configure-opencode-and-test). For production, consider mounting credentials from a Kubernetes Secret.
 
