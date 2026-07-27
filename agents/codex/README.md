@@ -696,14 +696,14 @@ Codex CLI uses TOML for all configuration (`config.toml`). There is no JSON sett
 
 > Tested on: OpenShell gateway v0.0.86, OpenShift 4.21, Codex CLI v0.144.0, Qwen3.6-27B.
 
-#### Prerequisites
+### Prerequisites
 
 - [Helm](https://helm.sh/) 3+ installed locally
 - [OpenShell CLI](https://docs.nvidia.com/openshell/get-started/quickstart) installed locally (`openshell --version` should print `0.0.58` or later)
 - The Kubernetes Agent Sandbox CRD must be installed: `oc get crd sandboxes.agents.x-k8s.io`
 - A vLLM endpoint reachable from within the cluster
 
-#### Step 1: Install the OpenShell gateway
+### Step 1: Install the OpenShell gateway
 
 ```bash
 export OPENSHELL_NAME=openshell
@@ -728,7 +728,7 @@ Grant the privileged SCC to the sandbox service account:
 oc adm policy add-scc-to-user privileged -z ${OPENSHELL_NAME}-sandbox -n <your-namespace>
 ```
 
-#### Step 2: Connect the OpenShell CLI
+### Step 2: Connect the OpenShell CLI
 
 Extract the mTLS certificates and register the gateway:
 
@@ -749,7 +749,7 @@ openshell gateway add https://127.0.0.1:18080 --local --name codex-cluster
 openshell status
 ```
 
-#### Step 3: Build the sandbox image
+### Step 3: Build the sandbox image
 
 Build inside the cluster so the internal registry can serve it to sandbox pods:
 
@@ -779,7 +779,7 @@ EOF
 oc start-build codex-sandbox --from-dir=. --follow
 ```
 
-#### Step 4: Create a sandbox and test
+### Step 4: Create a sandbox and test
 
 ```bash
 openshell sandbox create \
@@ -810,7 +810,7 @@ oc exec codex -c agent -- bash -c '
 '
 ```
 
-#### Cleanup
+### Cleanup
 
 ```bash
 openshell sandbox delete codex
