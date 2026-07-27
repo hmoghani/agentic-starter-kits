@@ -1,6 +1,6 @@
 <div style="text-align: center;">
 
-![AutoGen Logo](/images/autogen_logo.svg)
+<img src="/images/autogen_logo.svg" alt="AutoGen Logo" width="100" height="100">
 
 # AutoGen Agent (MCP)
 
@@ -30,7 +30,7 @@ dynamically (e.g. churn prediction, deployment), and answers user questions via 
 - [Podman](https://podman.io/) or [Docker](https://www.docker.com/) — for local container builds (Option A)
 - [oc](https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html) — for OpenShift deployment
 - [Helm](https://helm.sh/) — for deploying to Kubernetes/OpenShift
-- [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell — on Windows, use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended) or [Git Bash](https://git-scm.com/downloads)
+- [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell — on Windows, use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended) or [Git Bash](https://git-scm.com/install/)
 - **MCP Server** — this agent requires a running MCP server (included in `mcp_automl_template/`)
 
 ## Deploying Locally
@@ -242,7 +242,7 @@ make interact-mcp
 ## Deploying to OpenShift
 
 > **Before you begin:** Log in to OpenShift (`oc login`) and, if using local build + push, your container registry (`podman login`).
-> See [OpenShift Deployment](../../../docs/openshift-deployment.md) for full prerequisites and step-by-step instructions.
+> See [OpenShift Deployment](../../../../docs/openshift-deployment.md) for full prerequisites and step-by-step instructions.
 
 ### Step 1: Deploy the MCP server
 
@@ -448,6 +448,6 @@ instructions.
 ## Documentation and references
 
 - [AutoGen](https://microsoft.github.io/autogen/)
-- [MCP (Model Context Protocol)](https://modelcontextprotocol.io/)
-- [OGX Documentation](https://ogx-ai.github.io/docs/)
+- [MCP (Model Context Protocol)](https://modelcontextprotocol.io/docs/getting-started/intro)
+- [OGX Documentation](https://ogx-ai.github.io/docs)
 - MCP server in this repo: `mcp_automl_template/` (README, tool configuration, deploy)

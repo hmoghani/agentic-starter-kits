@@ -55,7 +55,7 @@ OpenCode is an AI-powered coding assistant. This implementation wraps OpenCode w
 
 ## Environment Variables
 
-The deployment follows [Kagenti standard naming conventions](https://github.com/kagenti):
+The deployment follows [Kagenti standard naming conventions](https://github.com/rossoctl/rossoctl):
 
 | Variable           | Description                                              | Required | Default    |
 |--------------------|----------------------------------------------------------|----------|------------|

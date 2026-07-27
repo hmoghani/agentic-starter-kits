@@ -2,7 +2,7 @@
 
 Run agents locally using Ollama and OGX for model serving, or connect to any OpenAI-compatible API.
 
-**Windows users:** The Makefiles require a bash-compatible shell. Use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), [Git Bash](https://git-scm.com/downloads), or a similar environment.
+**Windows users:** The Makefiles require a bash-compatible shell. Use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install), [Git Bash](https://git-scm.com/install/), or a similar environment.
 
 ## Option A: Ollama + OGX (fully local)
 

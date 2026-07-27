@@ -1,7 +1,7 @@
 # EvalHub Adapter
 
 Integration layer that bridges the existing pytest-based eval harness to
-[EvalHub](https://github.com/redhat-ai-services/evalhub)'s Kubernetes
+[EvalHub](https://github.com/eval-hub/eval-hub)'s Kubernetes
 orchestration on OpenShift. Designed to run **on-cluster** as an EvalHub job.
 
 ## Who this is for

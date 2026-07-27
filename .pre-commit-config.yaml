@@ -54,10 +54,22 @@ repos:
   # Markdownlint — Markdown linting
   # Rules are defined in .markdownlint.jsonc at the repo root
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.0
+    rev: v0.23.1
     hooks:
       - id: markdownlint-cli2
         args: [--fix]
+
+  # Lychee — link checking
+  # Requires lychee in $PATH: brew install lychee (macOS) or cargo install lychee
+  - repo: local
+    hooks:
+      - id: lychee
+        name: lychee link checker
+        entry: lychee
+        args: ['--config', 'lychee.toml', '--no-progress']
+        language: system
+        types_or: [markdown]
+        pass_filenames: true
 
   # Gitleaks — secret scanning
   # Keep version in sync with the gitleaks version in .github/workflows/code-quality.yml

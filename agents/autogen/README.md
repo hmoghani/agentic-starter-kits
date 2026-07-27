@@ -11,4 +11,4 @@ Agent templates built with [AutoGen](https://microsoft.github.io/autogen/) (Micr
 ## Resources
 
 - [AutoGen Documentation](https://microsoft.github.io/autogen/)
-- [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
+- [Model Context Protocol (MCP)](https://modelcontextprotocol.io/docs/getting-started/intro)

@@ -2,7 +2,7 @@
 
 ## What this agent does
 
-AI-powered terminal-based coding agent built on [OpenCode](https://github.com/sst/opencode). Provides code generation, multi-file editing, code review, and debugging capabilities. Deploys in web mode (OAuth-secured browser UI) or headless CLI mode for terminal sessions and CI pipelines.
+AI-powered terminal-based coding agent built on [OpenCode](https://github.com/anomalyco/opencode). Provides code generation, multi-file editing, code review, and debugging capabilities. Deploys in web mode (OAuth-secured browser UI) or headless CLI mode for terminal sessions and CI pipelines.
 
 ## Supported backends
 

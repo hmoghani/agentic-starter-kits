@@ -26,7 +26,7 @@ The recommended path is to validate your idea **before writing any code**. Run t
 
 **Using the fit-check skill (recommended):**
 
-If you have [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin installed:
+If you have [Claude Code](https://code.claude.com/docs) and the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin installed:
 
 ```text
 /agentic-starter-kits-skills:fit-check
@@ -136,6 +136,15 @@ Runs `uv lock` on any modified `pyproject.toml` and auto-updates the correspondi
 ### GitHub Actions workflow validation (actionlint)
 
 Validates `.github/workflows/` files using [actionlint](https://github.com/rhysd/actionlint). Only runs when workflow files are staged.
+
+### Link checking (lychee)
+
+Checks `.md` files for broken links using [lychee](https://github.com/lycheeverse/lychee). Runs on staged markdown files only. Configuration is in [`lychee.toml`](lychee.toml). Requires lychee in `$PATH`:
+
+```bash
+brew install lychee      # macOS
+cargo install lychee     # Linux / other
+```
 
 ## Linting and formatting
 
@@ -283,11 +292,11 @@ This allows `make run` to auto-install MLflow when `MLFLOW_TRACKING_URI` is set 
 
 ### Using the `integrate-tracing` Claude Code skill
 
-If you have [Claude Code](https://docs.anthropic.com/en/docs/claude-code) set up, the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin includes a skill that automates the entire process described above.
+If you have [Claude Code](https://code.claude.com/docs) set up, the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin includes a skill that automates the entire process described above.
 
 #### Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and configured
+- [Claude Code](https://code.claude.com/docs) installed and configured
 - Install the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin (see [Claude Code skills](#claude-code-skills))
 
 #### Running the full integration
@@ -342,7 +351,7 @@ All contributor and operator skills live in the [agentic-starter-kits-skills](ht
 
 ## Claude Code skills
 
-This project uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills to automate common contributor workflows. All contributor and operator skills live in the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin repo.
+This project uses [Claude Code](https://code.claude.com/docs) skills to automate common contributor workflows. All contributor and operator skills live in the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin repo.
 
 ### Available skills
 

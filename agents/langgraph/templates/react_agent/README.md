@@ -24,7 +24,7 @@ LangGraph and LangChain.
 - [Helm](https://helm.sh/) — for deploying to Kubernetes/OpenShift
 - [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell — on Windows,
   use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended)
-  or [Git Bash](https://git-scm.com/downloads)
+  or [Git Bash](https://git-scm.com/install/)
 
 ## Local Development
 
@@ -226,7 +226,7 @@ oc get route langgraph-react-agent -o jsonpath='{.spec.host}'
 make undeploy
 ```
 
-See [OpenShift Deployment](../../../docs/openshift-deployment.md) for more details.
+See [OpenShift Deployment](../../../../docs/openshift-deployment.md) for more details.
 
 ## Tests
 
@@ -271,7 +271,7 @@ curl http://localhost:8000/health
 
 ## Resources
 
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
-- [LangChain Documentation](https://python.langchain.com/)
-- [OGX Documentation](https://ogx-ai.github.io/docs/)
-- [Ollama Documentation](https://ollama.com/docs)
+- [LangGraph Documentation](https://docs.langchain.com/oss/python/langgraph/overview)
+- [LangChain Documentation](https://docs.langchain.com/oss/python/langchain/overview)
+- [OGX Documentation](https://ogx-ai.github.io/docs)
+- [Ollama Documentation](https://docs.ollama.com)

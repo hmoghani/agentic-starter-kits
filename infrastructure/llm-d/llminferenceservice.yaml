@@ -9,7 +9,7 @@
 #   <NODE_POOL_NAME>  - Label on GPU nodes for scheduling (e.g., gpu-llmd-nodes)
 #   <VLLM_IMAGE>      - vLLM image from Red Hat Ecosystem Catalog
 #                       (e.g., registry.redhat.io/rhaiis/vllm-cuda-rhel9@sha256:...)
-#                       Find the latest at: https://catalog.redhat.com/en/software/containers/rhaiis/vllm-cuda-rhel9
+#                       Find the latest at: https://catalog.redhat.com/en/software/containers/rhaiis/vllm-cuda-rhel9/6825c6b827e18fe3162148a9
 #
 # Deploy in redhat-ods-applications namespace (required by the gateway routing).
 #

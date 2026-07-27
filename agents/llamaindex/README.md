@@ -1,6 +1,6 @@
 # LlamaIndex Agents
 
-Agent templates built with [LlamaIndex](https://docs.llamaindex.ai/).
+Agent templates built with [LlamaIndex](https://developers.llamaindex.ai/python/framework/).
 
 ## Available Agents
 
@@ -10,5 +10,5 @@ Agent templates built with [LlamaIndex](https://docs.llamaindex.ai/).
 
 ## Resources
 
-- [LlamaIndex Documentation](https://docs.llamaindex.ai/)
-- [LlamaIndex Workflows](https://docs.llamaindex.ai/en/stable/module_guides/workflow/)
+- [LlamaIndex Documentation](https://developers.llamaindex.ai/python/framework/)
+- [LlamaIndex Workflows](https://developers.llamaindex.ai/python/llamaagents/workflows/)

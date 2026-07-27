@@ -24,7 +24,7 @@ connector to route inference through a OGX server's OpenAI-compatible API endpoi
 - [Helm](https://helm.sh/) — for deploying to Kubernetes/OpenShift
 - [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell — on Windows,
   use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended)
-  or [Git Bash](https://git-scm.com/downloads)
+  or [Git Bash](https://git-scm.com/install/)
 
 ## Local Development
 
@@ -190,7 +190,7 @@ oc get route google-adk-agent -o jsonpath='{.spec.host}'
 make undeploy
 ```
 
-See [OpenShift Deployment](../../../docs/openshift-deployment.md) for more details.
+See [OpenShift Deployment](../../../../docs/openshift-deployment.md) for more details.
 
 ## Tests
 
@@ -347,10 +347,10 @@ TOOLS = [dummy_web_search, my_custom_tool]
 
 ### Additional Resources
 
-- **Google ADK 2.0 Documentation**: <https://google.github.io/adk-docs/2.0/>
+- **Google ADK 2.0 Documentation**: <https://adk.dev/2.0/>
 - **LiteLLM Documentation**: <https://docs.litellm.ai/>
-- **OGX Documentation**: <https://ogx-ai.github.io/docs/>
-- **Ollama Documentation**: <https://ollama.com/docs>
+- **OGX Documentation**: <https://ogx-ai.github.io/docs>
+- **Ollama Documentation**: <https://docs.ollama.com>
 
 ---
 

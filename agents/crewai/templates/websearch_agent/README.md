@@ -26,7 +26,7 @@ questions. Use with any OpenAI-compatible API.
 - [Helm](https://helm.sh/) — for deploying to Kubernetes/OpenShift
 - [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell — on Windows,
   use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended)
-  or [Git Bash](https://git-scm.com/downloads)
+  or [Git Bash](https://git-scm.com/install/)
 
 ## Local Development
 
@@ -41,7 +41,7 @@ make init
 
 Edit `.env` with your configuration, then:
 
-See [Local Development](../../../docs/local-development.md) for Ollama + OGX setup for local model serving.
+See [Local Development](../../../../docs/local-development.md) for Ollama + OGX setup for local model serving.
 
 ### Pointing to a remotely hosted model
 
@@ -271,7 +271,7 @@ oc get route crewai-websearch-agent -o jsonpath='{.spec.host}'
 make undeploy
 ```
 
-See [OpenShift Deployment](../../../docs/openshift-deployment.md) for more details.
+See [OpenShift Deployment](../../../../docs/openshift-deployment.md) for more details.
 
 ## Tests
 

@@ -39,7 +39,7 @@ Create two S3-compatible connections in the project:
 1. **Results storage** – for pipeline artifacts and leaderboard (e.g. `automl-results-s3`). You will use this when configuring the Pipeline Server.
 2. **Training data** – for the dataset (e.g. `customer-churn-data-s3`). Note the **connection name**; you will use it as `train_data_secret_name` in the pipeline run.
 
-See: [Create the S3 connections](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-create-the-s3-connections).
+See: [Create the S3 connections](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-create-the-s3-connections).
 
 ### 1.3 Configure the Pipeline Server
 
@@ -47,24 +47,24 @@ See: [Create the S3 connections](https://github.com/red-hat-data-services/red-ha
 - Set the **Object storage connection** to the same bucket/credentials as your **results** S3 connection so runs and artifacts (leaderboard, models) are stored there.
 - Choose **Default database** or **External MySQL** as needed. Create/Save and wait until the Pipeline Server is ready.
 
-See: [Configure the Pipeline Server](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-configure-the-pipeline-server).
+See: [Configure the Pipeline Server](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-configure-the-pipeline-server).
 
 ### 1.4 Create a workbench with connections
 
 - In **Workbenches**, create a workbench and **attach** both the results and training-data S3 connections so you can access artifacts and data without a restart.
 
-See: [Create workbench with connections attached](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-create-workbench-with-connections-attached).
+See: [Create workbench with connections attached](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-create-workbench-with-connections-attached).
 
 ### 1.5 Upload the dataset to S3
 
-- Download the dataset (e.g. [WA_FnUseC_TelcoCustomerChurn.csv](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/data/WA_FnUseC_TelcoCustomerChurn.csv) for churn).
+- Download the dataset (e.g. [WA_FnUseC_TelcoCustomerChurn.csv](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/data/churn/input_data/WA_FnUseC_TelcoCustomerChurn.csv) for churn).
 - Upload it to the bucket used by the **training data** connection. Note the **bucket name** and **object key** (path) for the pipeline run.
 
-See: [Upload the training dataset to S3](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-upload-the-training-dataset-to-s3).
+See: [Upload the training dataset to S3](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#upload-the-training-dataset-to-s3).
 
 ### 1.6 Add the AutoML pipeline and run it
 
-- Get the compiled AutoML pipeline from the repo: [autogluon_tabular_training_pipeline](https://github.com/LukaszCmielowski/pipelines-components/tree/rhoai_automl/pipelines/training/automl/autogluon_tabular_training_pipeline) (branch `rhoai_automl`), e.g. [pipeline.yaml](https://github.com/LukaszCmielowski/pipelines-components/tree/rhoai_automl/pipelines/training/automl/autogluon_tabular_training_pipeline/pipeline.yaml).
+- Get the AutoML pipeline from the repo: [autogluon_tabular_training_pipeline](https://github.com/opendatahub-io/pipelines-components/tree/main/pipelines/training/automl/autogluon_tabular_training_pipeline), e.g. [pipeline.py](https://github.com/opendatahub-io/pipelines-components/blob/main/pipelines/training/automl/autogluon_tabular_training_pipeline/pipeline.py).
 - In OpenShift AI **Pipelines**, add it as a new **Pipeline Definition** (upload/create from YAML).
 - Create a **pipeline run** with at least:
   - **train_data_secret_name** – name of the training-data S3 connection
@@ -75,13 +75,13 @@ See: [Upload the training dataset to S3](https://github.com/red-hat-data-service
   - **top_n** – e.g. `3`
 - Start the run and wait for completion.
 
-See: [Add the AutoML pipeline](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-add-the-automl-pipeline-as-a-pipeline-definition), [Run AutoML with the required inputs](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-run-automl-with-the-required-inputs).
+See: [Add the AutoML pipeline](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-add-the-automl-pipeline-as-a-pipeline-definition), [Run AutoML with the required inputs](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-run-automl-with-the-required-inputs).
 
 ### 1.7 View the leaderboard
 
 - Open the run **Artifacts** and locate the **leaderboard** (e.g. HTML). Download or open it and pick the **best model** (e.g. top-ranked) to deploy.
 
-See: [View the leaderboard](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-view-the-leaderboard).
+See: [View the leaderboard](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-view-the-leaderboard).
 
 ---
 
@@ -97,17 +97,17 @@ Follow the tutorial from **Model Registry** through **Deployment Scoring**.
   - **Path**: root folder of one refitted predictor (e.g. under `.../autogluon-models-full-refit/<task_id>/model_artifact/<ModelName>_FULL/`).
   - Set **Model name**, **Version**, and **Source model format** (e.g. custom / AutoGluon), then **Register**.
 
-See: [Model Registry](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-model-registry).
+See: [Model Registry](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-model-registry).
 
 ### 2.2 Prepare the AutoGluon ServingRuntime (KServe)
 
-- **Build the serving image** on the cluster (ImageStream + BuildConfig) using the [tutorial’s YAML](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-prepare-the-servingruntime-for-autogluon-with-kserve) (Git source, Dockerfile, output to ImageStream).
+- **Build the serving image** on the cluster (ImageStream + BuildConfig) using the [tutorial’s YAML](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-prepare-the-servingruntime-for-autogluon-with-kserve) (Git source, Dockerfile, output to ImageStream).
 - **Create the ServingRuntime** from the tutorial’s ServingRuntime YAML:
   - Set `metadata.namespace` to your project.
   - Set `spec.containers[0].image` to the built image (e.g. `image-registry.openshift-image-registry.svc:5000/<namespace>/autogluonkserveimagev1:latest`).
 - In OpenShift AI: **Settings** → **Serving runtimes** → **Add serving runtime** → upload the YAML, select **REST** and **Predictive model**, then **Create**.
 
-See: [Prepare the ServingRuntime for AutoGluon with KServe](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-prepare-the-servingruntime-for-autogluon-with-kserve).
+See: [Prepare the ServingRuntime for AutoGluon with KServe](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-prepare-the-servingruntime-for-autogluon-with-kserve).
 
 ### 2.3 Deploy the model
 
@@ -121,7 +121,7 @@ See: [Prepare the ServingRuntime for AutoGluon with KServe](https://github.com/r
   - **Make model deployment available through an external route** – enable so you can call the endpoint from your machine (for the MCP server).
 - **Deploy model** and wait until the deployment is running.
 
-See: [Model Deployment](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-model-deployment).
+See: [Model Deployment](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-model-deployment).
 
 ### 2.4 Get the inference URL and token
 
@@ -131,7 +131,7 @@ See: [Model Deployment](https://github.com/red-hat-data-services/red-hat-ai-exam
   where `<MODEL_NAME>` is the deployment’s **Resource name** (lowercase, no spaces). Example: `https://my-model-myproject.apps.example.com/v1/models/my-churn-model:predict`
 - **Token** (if you enabled token auth): **Projects** → *your project* → **Deployments** → expand the deployment → use the **Token secret** value as `DEPLOYMENT_TOKEN`.
 
-See: [Deployment Scoring](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-deployment-scoring) for the exact request format (e.g. `instances` with per-field arrays). The MCP server sends payloads in that same shape.
+See: [Deployment Scoring](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-deployment-scoring) for the exact request format (e.g. `instances` with per-field arrays). The MCP server sends payloads in that same shape.
 
 ---
 
@@ -149,7 +149,7 @@ The MCP server sends a JSON body like:
 }
 ```
 
-Your deployment (e.g. AutoGluon churn) expects one object per instance with the **same feature names** as in training. This repo provides `churn_schema.json` and the tool `invoke_churn` in `tools_config.yaml`. The schema properties match the churn model’s inputs (e.g. `gender`, `tenure`, `Contract`, `Churn`, etc. as in the [tutorial’s curl example](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md#-deployment-scoring)).
+Your deployment (e.g. AutoGluon churn) expects one object per instance with the **same feature names** as in training. This repo provides `churn_schema.json` and the tool `invoke_churn` in `tools_config.yaml`. The schema properties match the churn model’s inputs (e.g. `gender`, `tenure`, `Contract`, `Churn`, etc. as in the [tutorial’s curl example](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md#-deployment-scoring)).
 
 Set `DEPLOYMENT_URL` (and `DEPLOYMENT_TOKEN` if used) to your churn predict endpoint. To add another tool, add a new JSON Schema and entry in `tools_config.yaml` with its own `schema_path` and the same `deployment_url_env` / `deployment_token_env` if needed.
 
@@ -201,7 +201,7 @@ The tool will POST to `DEPLOYMENT_URL` with `Authorization: Bearer <DEPLOYMENT_T
 
 ## References
 
-- [Red Hat AI examples – Predict Customer Churn (AutoML)](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md) – full tutorial (project, S3, pipeline, leaderboard, predictor notebook, model registry, ServingRuntime, deployment, scoring).
-- [autogluon_tabular_training_pipeline](https://github.com/LukaszCmielowski/pipelines-components/tree/rhoai_automl/pipelines/training/automl/autogluon_tabular_training_pipeline) – pipeline source (branch `rhoai_automl`).
+- [Red Hat AI examples – Predict Customer Churn (AutoML)](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md) – full tutorial (project, S3, pipeline, leaderboard, predictor notebook, model registry, ServingRuntime, deployment, scoring).
+- [autogluon_tabular_training_pipeline](https://github.com/opendatahub-io/pipelines-components/tree/main/pipelines/training/automl/autogluon_tabular_training_pipeline) – pipeline source.
 - [KServe V1 Protocol](https://kserve.github.io/website/docs/concepts/architecture/data-plane/v1-protocol) – inference request/response format.
 - This repo’s [README](README.md) – MCP server setup, tools, Cursor/Ollama, and `.env`.

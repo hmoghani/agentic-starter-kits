@@ -21,10 +21,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Setup Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
 
@@ -38,8 +38,8 @@ jobs:
         run: ruff format --check .
 
       - name: Markdownlint
-        # v24.0.0 bundles markdownlint-cli2 0.23.0 — keep in sync with .pre-commit-config.yaml
-        uses: DavidAnson/markdownlint-cli2-action@8de2aa07cae85fd17c0b35642db70cf5495f1d25  # v24.0.0
+        # v24.1.0 bundles markdownlint-cli2 0.23.1 — keep in sync with .pre-commit-config.yaml
+        uses: DavidAnson/markdownlint-cli2-action@6bf21b07787794f89a243495939cd651942aeabe  # v24.1.0
         with:
           globs: "**/*.md"
 
@@ -49,6 +49,44 @@ jobs:
         with:
           version: 1.7.12
 
+  link-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Determine files to check
+        id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=$(gh pr diff ${{ github.event.pull_request.number }} --name-only | grep '\.md$' | tr '\n' ' ' || true)
+            if [ -z "${changed// /}" ]; then
+              echo "No markdown files changed — skipping link check"
+              echo "targets=" >> "$GITHUB_OUTPUT"
+            else
+              echo "Checking changed markdown files: $changed"
+              echo "targets=$changed" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "targets='./**/*.md'" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Link check (lychee)
+        if: steps.files.outputs.targets != ''
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8  # v2
+        with:
+          args: "--config lychee.toml --no-progress ${{ steps.files.outputs.targets }}"
+          token: ${{ github.token }}
+          fail: true
+          jobSummary: true
+
   lockfile-check:
     runs-on: ubuntu-latest
     permissions:
@@ -56,7 +94,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
@@ -90,7 +128,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
 
@@ -115,12 +153,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
 
@@ -183,12 +221,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
 
@@ -209,14 +247,14 @@ jobs:
       github.event_name != 'pull_request' &&
       github.repository == 'red-hat-data-services/agentic-starter-kits' &&
       (github.event_name != 'workflow_dispatch' || github.ref_name == 'main')
-    needs: [lint, lockfile-check, secret-scanning, type-check, github-scripts-tests]
+    needs: [lint, link-check, lockfile-check, secret-scanning, type-check, github-scripts-tests]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 

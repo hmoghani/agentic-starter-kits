@@ -13,5 +13,5 @@ Agent templates built with [LangGraph](https://langchain-ai.github.io/langgraph/
 
 ## Resources
 
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
-- [LangChain Documentation](https://python.langchain.com/)
+- [LangGraph Documentation](https://docs.langchain.com/oss/python/langgraph/overview)
+- [LangChain Documentation](https://docs.langchain.com/oss/python/langchain/overview)

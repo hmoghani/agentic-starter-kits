@@ -13,7 +13,7 @@ OpenClaw relies on models that support structured tool-calling (function calling
 | **qwen3.5:27b** | Ollama (local) | Working | Tools work, but 41GB RAM usage makes it impractical locally |
 | **llama3.2:3b** | Ollama (local) | Partial | Executes tools but gets confused by OpenClaw's internal system prompts |
 | **phi4-mini:3.8b** | Ollama (local) | Broken | Emits raw JSON in response body instead of native tool calls |
-| **codex/gpt-5.4** | Codex Harness | Expected | Routes through Codex app-server; requires sidecar deployment (see [codex-harness.md](codex-harness.md)) |
+| **codex/gpt-5.4** | Codex Harness | Expected | Routes through Codex app-server; requires sidecar deployment |
 
 ## Critical Warning: Hallucinated Tool Results
 
@@ -39,7 +39,7 @@ Mixed deployments can use `runtime: "auto"` to let OpenClaw select the harness b
 
 - **On OpenShift (self-hosted):** Use gpt-oss-20b or larger via vLLM with tool-calling flags enabled
 - **On OpenShift (Codex):** Use `codex/gpt-5.4` with the Codex Harness sidecar for thread management and guardian approvals
-- **On OpenShift (Google):** Use `google/gemini-2.5-pro` via Google AI Studio with `GEMINI_API_KEY` (Vertex AI SA auth is not yet supported natively — see [vertex-ai-provider.md](vertex-ai-provider.md#known-limitation-vertex-ai-auth))
+- **On OpenShift (Google):** Use `google/gemini-2.5-pro` via Google AI Studio with `GEMINI_API_KEY` (Vertex AI SA auth is not yet supported natively)
 - **Local testing:** Use qwen2.5:7b via Ollama with a 32k context window
 - **Always verify:** Test tool-calling with a known-answer query (e.g., "list files on my Desktop") before trusting agent output
 

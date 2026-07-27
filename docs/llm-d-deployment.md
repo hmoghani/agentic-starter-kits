@@ -51,7 +51,7 @@ The following values are specific to your environment. Replace all `<PLACEHOLDER
 | `<NODE_POOL_NAME>` | Label for GPU node pool scheduling | `gpu-llmd-nodes` |
 | `<PULL_SECRET_FILE>` | Path to your Red Hat registry pull secret YAML | `my-pull-secret.yaml` |
 | `<PULL_SECRET_NAME>` | Name of the pull secret in the cluster | `my-pull-secret` |
-| `<VLLM_IMAGE>` | vLLM container image — get the latest digest from the [Red Hat Ecosystem Catalog](https://catalog.redhat.com/en/software/containers/rhaiis/vllm-cuda-rhel9) | `registry.redhat.io/rhaiis/vllm-cuda-rhel9@sha256:...` |
+| `<VLLM_IMAGE>` | vLLM container image — get the latest digest from the [Red Hat Ecosystem Catalog](https://catalog.redhat.com/en/software/containers/rhaiis/vllm-cuda-rhel9/6825c6b827e18fe3162148a9) | `registry.redhat.io/rhaiis/vllm-cuda-rhel9@sha256:...` |
 | `<GATEWAY_HOST>` | The maas-default-gateway external hostname (auto-assigned ELB or manually configured) | `a1b2c3.us-east-2.elb.amazonaws.com` |
 | `<OGX_ROUTE>` | OGX external route hostname (if using OGX) | `ogx-route-redhat-ods-applications.apps.example.com` |
 

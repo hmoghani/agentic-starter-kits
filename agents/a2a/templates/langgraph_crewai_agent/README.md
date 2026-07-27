@@ -22,7 +22,7 @@ An **A2A (Agent-to-Agent)** example: a **CrewAI** pod exposes an A2A JSON-RPC se
 - [Podman](https://podman.io/) or [Docker](https://www.docker.com/) — for local container builds (`Makefile` uses whichever is on `PATH`)
 - [oc](https://docs.openshift.com/container-platform/latest/cli_reference/openshift_cli/getting-started-cli.html) — for OpenShift deployment
 - [Helm](https://helm.sh/) — for deploying to Kubernetes/OpenShift
-- [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell — on Windows, use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended) or [Git Bash](https://git-scm.com/downloads)
+- [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell — on Windows, use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended) or [Git Bash](https://git-scm.com/install/)
 
 ---
 
@@ -41,7 +41,7 @@ Edit `.env` with your configuration (see [Configuration](#configuration) below).
 
 #### Creating environment
 
-Install dependencies with `make env`, same idea as the Google ADK agent ([Creating environment](../../google/adk/README.md#creating-environment)):
+Install dependencies with `make env`, same idea as the Google ADK agent ([Creating environment](../../../google/templates/adk/README.md#creating-environment)):
 
 ```bash
 make env
@@ -67,7 +67,7 @@ CREW_A2A_PORT=9100
 LANGGRAPH_A2A_PORT=9200
 ```
 
-See [Local Development](../../../docs/local-development.md) for Ollama + OGX setup for local model serving.
+See [Local Development](../../../../docs/local-development.md) for Ollama + OGX setup for local model serving.
 
 #### OpenShift cluster (values for `make build` / `make push` / `make deploy`)
 
@@ -295,7 +295,7 @@ The LangGraph pod uses in-cluster **`CREW_A2A_URL=http://a2a-crew-agent:8080`**.
 
 #### Manage Agents using Kagenti (Optional)
 
-Register agents with [Kagenti](https://github.com/kagenti/kagenti) for unified discovery and management.
+Register agents with [Kagenti](https://github.com/rossoctl/rossoctl) for unified discovery and management.
 
 **Prerequisites:**
 
@@ -335,7 +335,7 @@ oc get route a2a-langgraph-agent -o jsonpath='{.spec.host}'
 make undeploy
 ```
 
-See [OpenShift Deployment](../../../docs/openshift-deployment.md) for more details.
+See [OpenShift Deployment](../../../../docs/openshift-deployment.md) for more details.
 
 ---
 
@@ -446,6 +446,6 @@ pytest agents/a2a/templates/langgraph_crewai_agent/tests/behavioral/ -m a2a_lang
 ## Resources
 
 - [A2A Python SDK](https://pypi.org/project/a2a-sdk/)
-- [Deploying to OpenShift (generic)](../../../docs/openshift-deployment.md)
-- [Local Development](../../../docs/local-development.md)
+- [Deploying to OpenShift (generic)](../../../../docs/openshift-deployment.md)
+- [Local Development](../../../../docs/local-development.md)
 - Related patterns: `agents/google/templates/adk/` (Helm + `make build` / `make push` / `make deploy`), `agents/llamaindex/templates/websearch_agent/`, `agents/langgraph/templates/react_agent/`

@@ -216,7 +216,7 @@ No code changes are required; tools are created from the YAML and schema at star
 
 ## AutoML experiment and deployment
 
-For a full walkthrough of creating an AutoML experiment on Red Hat OpenShift AI, deploying the best model, and using it with this MCP server, see **[AUTOML_DEPLOYMENT.md](AUTOML_DEPLOYMENT.md)**. It is based on the [Red Hat AI examples – Predict Customer Churn tutorial](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/automl_sample/examples/automl/churn_prediction_tutorial.md) and covers:
+For a full walkthrough of creating an AutoML experiment on Red Hat OpenShift AI, deploying the best model, and using it with this MCP server, see **[AUTOML_DEPLOYMENT.md](AUTOML_DEPLOYMENT.md)**. It is based on the [Red Hat AI examples – Predict Customer Churn tutorial](https://github.com/red-hat-data-services/red-hat-ai-examples/blob/main/examples/automl/churn_prediction_tutorial.md) and covers:
 
 1. Creating a project, S3 connections, Pipeline Server, and workbench.
 2. Running the AutoML pipeline and viewing the leaderboard.

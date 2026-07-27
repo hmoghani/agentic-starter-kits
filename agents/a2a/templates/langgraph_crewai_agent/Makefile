@@ -4,7 +4,7 @@ CHART_DIR      := ../../deployment
 VALUES_FILE    := values.yaml
 CONTAINER_CLI  := $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
 
-.PHONY: init re-init env test run-app run-app-fresh run-crew run-langgraph build push deploy undeploy dry-run test-integration help
+.PHONY: init re-init env test run-app run-app-fresh run-crew run-langgraph build build-openshift push deploy undeploy dry-run test-integration help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -124,6 +124,16 @@ push: _check-env ## Push both image tags to the registry
 	echo "Pushing $$CREW and $$LG..." && \
 	$(CONTAINER_CLI) push "$$CREW" && $(CONTAINER_CLI) push "$$LG" && \
 	echo "Push complete."
+
+build-openshift: ## Build image in-cluster via OpenShift BuildConfig (no podman/docker needed)
+	@oc new-build --strategy=docker --binary --name=$(AGENT_NAME) --to=$(AGENT_NAME):latest 2>/dev/null || true && \
+	  oc start-build $(AGENT_NAME) --from-dir=. --follow && \
+	  oc tag $(AGENT_NAME):latest $(AGENT_NAME):crew && \
+	  oc tag $(AGENT_NAME):latest $(AGENT_NAME):langgraph && \
+	  NS=$$(oc project -q) && \
+	  echo "" && \
+	  echo "Image built and tagged :crew + :langgraph. To deploy, set in .env:" && \
+	  echo "  CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/$$NS/$(AGENT_NAME):latest"
 
 deploy: _check-env ## Two-phase Helm deploy (Routes first, then Deployments with public Agent Card URLs)
 	@[ -n "$(CONTAINER_CLI)" ] || true

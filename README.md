@@ -1,6 +1,6 @@
 <div style="text-align: center;">
 
-![Agentic Starter Kits](/images/ask_logo.png)
+<img src="./images/ask_logo.png" alt="Agentic Starter Kits" width="200" height="200">
 
 # Agentic Starter Kits
 
@@ -129,14 +129,14 @@ See `tests/behavioral/` for full details.
 
 ## Claude Code Skills
 
-This project has [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skills that automate contributor workflows — tracing integration, deployment, test scaffolding, and more. Contributor and operator skills are in the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin. See [CONTRIBUTING.md — Claude Code skills](CONTRIBUTING.md#claude-code-skills) for installation instructions and the full skill list.
+This project has [Claude Code](https://code.claude.com/docs) skills that automate contributor workflows — tracing integration, deployment, test scaffolding, and more. Contributor and operator skills are in the [agentic-starter-kits-skills](https://github.com/red-hat-data-services/agentic-starter-kits-skills) plugin. See [CONTRIBUTING.md — Claude Code skills](CONTRIBUTING.md#claude-code-skills) for installation instructions and the full skill list.
 
 ## Additional Resources
 
-- **OGX Documentation**: <https://ogx-ai.github.io/docs/>
+- **OGX Documentation**: <https://ogx-ai.github.io/docs>
 - **Ollama Documentation**: <https://docs.ollama.com/>
 - **OpenShift Documentation**: <https://docs.openshift.com/>
-- **Kubernetes**: <https://kubernetes.io/docs/>
+- **Kubernetes**: <https://kubernetes.io/docs/home/>
 
 ## Contributing
 

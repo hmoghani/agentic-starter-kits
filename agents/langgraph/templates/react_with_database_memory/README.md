@@ -33,7 +33,7 @@ Key features:
 - [Helm](https://helm.sh/) -- for deploying to Kubernetes/OpenShift
 - [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell -- on Windows,
   use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended)
-  or [Git Bash](https://git-scm.com/downloads)
+  or [Git Bash](https://git-scm.com/install/)
 - **PostgreSQL 14+** -- managed service or local instance (see setup below)
 
 ## Local Development
@@ -300,7 +300,7 @@ oc get route langgraph-db-memory-agent -o jsonpath='{.spec.host}'
 make undeploy
 ```
 
-See [OpenShift Deployment](../../../docs/openshift-deployment.md) for more details.
+See [OpenShift Deployment](../../../../docs/openshift-deployment.md) for more details.
 
 ## Tests
 
@@ -454,8 +454,8 @@ To permanently delete a conversation thread (or all threads), use the provided s
 
 ## Resources
 
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
-- [LangGraph Checkpointers](https://langchain-ai.github.io/langgraph/concepts/persistence/)
-- [LangChain Documentation](https://python.langchain.com/)
-- [OGX Documentation](https://ogx-ai.github.io/docs/)
+- [LangGraph Documentation](https://docs.langchain.com/oss/python/langgraph/overview)
+- [LangGraph Checkpointers](https://docs.langchain.com/oss/python/langgraph/persistence)
+- [LangChain Documentation](https://docs.langchain.com/oss/python/langchain/overview)
+- [OGX Documentation](https://ogx-ai.github.io/docs)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)

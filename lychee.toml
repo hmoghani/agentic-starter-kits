@@ -1,0 +1,48 @@
+# Lychee link checker configuration
+# https://lychee.cli.rs/
+
+# Root directory for resolving root-relative links (e.g. /images/logo.svg)
+root_dir = "."
+
+# Accept these HTTP status codes as valid (no global 403 — new broken links are still caught)
+accept = ["200", "206", "301", "302", "308"]
+
+# Maximum number of concurrent network requests
+max_concurrency = 32
+
+# Timeout for each request (in seconds)
+timeout = 15
+
+# Number of retries for failed requests
+max_retries = 2
+
+# Retry wait time (in seconds)
+retry_wait_time = 2
+
+# Do not check email addresses
+include_mail = false
+
+# Use curl-style user agent — docs.redhat.com and docs.openshift.com block
+# non-curl UAs (403), but allow curl/X.Y.Z through
+user_agent = "curl/8.7.1"
+
+# Skip virtual environments and vendored dependencies
+# PR template links resolve from repo root in GitHub but from .github/ locally
+exclude_path = ["\\.venv", "node_modules", "\\.github/PULL_REQUEST_TEMPLATE\\.md"]
+
+# Domain-scoped exclusions — only skip URLs we've confirmed are false positives.
+# Do NOT add a global `accept = [403]` — we want new broken links to surface.
+exclude = [
+    # Bot-blocking site
+    "^https://developer\\.nps\\.gov",
+
+    # Localhost URLs (expected in dev docs)
+    "^http://localhost",
+    "^http://127\\.0\\.0\\.1",
+
+    # TLS handshake/timeout issues with lychee
+    "^https://www\\.gnu\\.org",
+
+    # milvus.io/docs — returns 403 to all automated requests
+    "^https://milvus\\.io/docs",
+]

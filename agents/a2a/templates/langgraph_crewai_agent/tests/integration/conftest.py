@@ -16,7 +16,9 @@ from integration.utils import (
 
 logger = logging.getLogger(__name__)
 
-_REQUIRED_ENV = ("BASE_URL", "MODEL_ID", "CONTAINER_IMAGE")
+INTERNAL_REGISTRY = "image-registry.openshift-image-registry.svc:5000"
+
+_REQUIRED_ENV = ("BASE_URL", "MODEL_ID")
 
 _DEPLOYMENT_NAMES = ["a2a-crew-agent", "a2a-langgraph-agent"]
 
@@ -34,9 +36,9 @@ def agent_name(agent_dir):
     return load_agent_name(agent_dir)
 
 
-def _write_env_file(agent_dir):
-    """Write a .env from env vars. CONTAINER_IMAGE comes from environment (external registry)."""
-    missing = [v for v in _REQUIRED_ENV if v not in os.environ]
+def _write_env_file(agent_dir, container_image):
+    """Write a .env file so Makefile targets can source it."""
+    missing = [v for v in _REQUIRED_ENV if not os.environ.get(v)]
     if missing:
         pytest.fail(
             f"Missing required env vars for A2A multi-agent deployment: "
@@ -52,7 +54,7 @@ def _write_env_file(agent_dir):
         f"API_KEY={os.environ.get('API_KEY', 'not-needed')}\n"
         f"BASE_URL={os.environ['BASE_URL']}\n"
         f"MODEL_ID={os.environ['MODEL_ID']}\n"
-        f"CONTAINER_IMAGE={os.environ['CONTAINER_IMAGE']}\n",
+        f"CONTAINER_IMAGE={container_image}\n",
         encoding="utf-8",
     )
     return env_path, orig_env
@@ -67,15 +69,13 @@ def all_routes(deployed_agent):
 @pytest.fixture(scope="module")
 def deployed_agent(cluster_auth, agent_dir, agent_name):  # noqa: F811
     namespace = cluster_auth["namespace"]
-    env_path, orig_env = _write_env_file(agent_dir)
+    container_image = f"{INTERNAL_REGISTRY}/{namespace}/{agent_name}:latest"
+    env_path, orig_env = _write_env_file(agent_dir, container_image)
 
     try:
         try:
-            logger.info("Building container image locally...")
-            run_make("build", cwd=agent_dir, timeout=600)
-
-            logger.info("Pushing image to external registry...")
-            run_make("push", cwd=agent_dir, timeout=300)
+            logger.info("Building image on cluster via build-openshift...")
+            run_make("build-openshift", cwd=agent_dir, timeout=600)
 
             logger.info("Deploying to cluster (two-phase Helm)...")
             run_make("deploy", cwd=agent_dir, timeout=600)

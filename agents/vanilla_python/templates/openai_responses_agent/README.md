@@ -25,7 +25,7 @@ endpoint that supports the Responses API.
 - [Helm](https://helm.sh/) — for deploying to Kubernetes/OpenShift
 - [GNU Make](https://www.gnu.org/software/make/) and a bash-compatible shell — on Windows,
   use [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (recommended)
-  or [Git Bash](https://git-scm.com/downloads)
+  or [Git Bash](https://git-scm.com/install/)
 
 ## Local Development
 
@@ -224,7 +224,7 @@ oc get route openai-responses-agent -o jsonpath='{.spec.host}'
 make undeploy
 ```
 
-See [OpenShift Deployment](../../../docs/openshift-deployment.md) for more details.
+See [OpenShift Deployment](../../../../docs/openshift-deployment.md) for more details.
 
 ## Tests
 
