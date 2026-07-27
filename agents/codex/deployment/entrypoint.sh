@@ -157,7 +157,7 @@ setup_model_provider() {
         # Just set the model if specified
         if [[ -n "${OPENAI_MODEL:-}" ]]; then
             if ! grep -q '^model\s*=' "${config_file}" 2>/dev/null; then
-                echo "model = \"${OPENAI_MODEL}\"" >> "${config_file}"
+                echo "model = \"$(sanitize_value "${OPENAI_MODEL}")\"" >> "${config_file}"
             fi
         fi
         return
@@ -242,7 +242,7 @@ setup_mcp() {
                 "\n[mcp_servers.\($name)]",
                 (if .url then "url = \"\(.url)\"" else empty end),
                 (if .command then "command = \"\(.command)\"" else empty end),
-                (if .args then "args = [\(.args | map("\"" + . + "\"") | join(", "))]" else empty end),
+                (if .args then "args = [\(.args | map(@json) | join(", "))]" else empty end),
                 ""
             ' 2>/dev/null)
             if [[ -n "${server_toml}" ]]; then

@@ -23,6 +23,7 @@ A guide to deploying [OpenAI Codex CLI](https://github.com/openai/codex) as a co
 - [Troubleshooting](#troubleshooting)
 - [Cleanup](#cleanup)
 - [Known Limitations](#known-limitations)
+- [OpenShell Sandbox](#openshell-sandbox)
 
 ---
 
@@ -687,6 +688,133 @@ Unlike Claude Code, Codex CLI does not have a granular permission system for fil
 
 Codex CLI uses TOML for all configuration (`config.toml`). There is no JSON settings file equivalent. The entrypoint's `MCP_CONFIG_JSON` support converts JSON to TOML at startup for compatibility, but only a subset of fields (`url`, `command`, `args`) are converted. For full MCP server configuration (e.g., `bearer_token_env_var`, `env` blocks), use native TOML.
 
-### OpenShell Sandbox Variant
+---
 
-The `Containerfile.openshell` builds a separate image for the OpenShell sandbox environment. This variant uses a different base image (`openshell-base`) and does not include the RHOAI entrypoint or session persistence. It is intended for ephemeral sandbox sessions, not persistent OpenShift deployments.
+## OpenShell Sandbox
+
+[NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) is an open-source sandbox runtime for AI agents. The `Containerfile.openshell` builds a Codex sandbox image based on `quay.io/aipcc/agentic-ci/openshell` (RHEL 10). This variant does not include the RHOAI entrypoint or session persistence — it is intended for ephemeral sandbox sessions.
+
+> Tested on: OpenShell gateway v0.0.86, OpenShift 4.21, Codex CLI v0.144.0, Qwen3.6-27B.
+
+#### Prerequisites
+
+- [Helm](https://helm.sh/) 3+ installed locally
+- [OpenShell CLI](https://docs.nvidia.com/openshell/get-started/quickstart) installed locally (`openshell --version` should print `0.0.58` or later)
+- The Kubernetes Agent Sandbox CRD must be installed: `oc get crd sandboxes.agents.x-k8s.io`
+- A vLLM endpoint reachable from within the cluster
+
+#### Step 1: Install the OpenShell gateway
+
+```bash
+export OPENSHELL_NAME=openshell
+
+# On shared clusters, use a unique name to avoid ClusterRole conflicts:
+# export OPENSHELL_NAME=openshell-<your-namespace>
+
+helm install openshell oci://ghcr.io/nvidia/openshell/helm-chart \
+  --version 0.0.86 \
+  --namespace <your-namespace> \
+  --set podSecurityContext.fsGroup=null \
+  --set securityContext.runAsUser=null \
+  --set server.auth.allowUnauthenticatedUsers=true \
+  --set fullnameOverride=${OPENSHELL_NAME}
+
+oc rollout status statefulset/${OPENSHELL_NAME} --timeout=120s
+```
+
+Grant the privileged SCC to the sandbox service account:
+
+```bash
+oc adm policy add-scc-to-user privileged -z ${OPENSHELL_NAME}-sandbox -n <your-namespace>
+```
+
+#### Step 2: Connect the OpenShell CLI
+
+Extract the mTLS certificates and register the gateway:
+
+```bash
+(umask 077 && mkdir -p ~/.config/openshell/gateways/codex-cluster/mtls)
+
+oc get secret openshell-client-tls \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d > ~/.config/openshell/gateways/codex-cluster/mtls/ca.crt
+
+oc get secret openshell-client-tls \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d > ~/.config/openshell/gateways/codex-cluster/mtls/tls.crt
+
+(umask 077 && oc get secret openshell-client-tls \
+  -o jsonpath='{.data.tls\.key}' | base64 -d > ~/.config/openshell/gateways/codex-cluster/mtls/tls.key)
+
+oc port-forward svc/${OPENSHELL_NAME} 18080:8080 &
+openshell gateway add https://127.0.0.1:18080 --local --name codex-cluster
+openshell status
+```
+
+#### Step 3: Build the sandbox image
+
+Build inside the cluster so the internal registry can serve it to sandbox pods:
+
+```bash
+cd agents/codex/deployment
+
+oc create imagestream codex-sandbox
+
+cat <<'EOF' | oc apply -f -
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: codex-sandbox
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: codex-sandbox:latest
+  source:
+    type: Binary
+  strategy:
+    dockerStrategy:
+      dockerfilePath: Containerfile.openshell
+    type: Docker
+EOF
+
+oc start-build codex-sandbox --from-dir=. --follow
+```
+
+#### Step 4: Create a sandbox and test
+
+```bash
+openshell sandbox create \
+  --name codex \
+  --from image-registry.openshift-image-registry.svc:5000/<your-namespace>/codex-sandbox:latest \
+  -- sleep infinity
+
+openshell sandbox list
+```
+
+Test Codex inside the sandbox:
+
+```bash
+oc exec codex -c agent -- bash -c '
+  export OPENAI_BASE_URL="http://<vllm-service>.<namespace>.svc.cluster.local/v1"
+  export OPENAI_API_KEY="dummy"
+  export CODEX_API_KEY="dummy"
+  codex exec \
+    -c model_provider=vllm \
+    -c model="<model-name>" \
+    -c model_providers.vllm.name="vLLM" \
+    -c model_providers.vllm.base_url="${OPENAI_BASE_URL}" \
+    -c model_providers.vllm.supports_websockets=false \
+    -c model_supports_reasoning_summaries=false \
+    --sandbox danger-full-access \
+    --skip-git-repo-check \
+    "What is 2+2? Reply with just the number."
+'
+```
+
+#### Cleanup
+
+```bash
+openshell sandbox delete codex
+helm uninstall openshell -n <your-namespace>
+oc delete imagestream codex-sandbox
+oc delete buildconfig codex-sandbox
+```

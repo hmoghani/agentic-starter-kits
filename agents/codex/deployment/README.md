@@ -16,7 +16,7 @@ For the full deployment guide, see the [Codex on OpenShift README](../README.md)
 |------|-------------|
 | `Containerfile` | RHOAI image (UBI 9 minimal, Codex via npm, entrypoint, MCP, session persistence) |
 | `Containerfile.base` | Alternative: compiles Codex from source (Rust cross-compilation) |
-| `Containerfile.openshell` | OpenShell sandbox variant (extends openshell-base) |
+| `Containerfile.openshell` | OpenShell sandbox variant (RHEL 10, extends `quay.io/aipcc/agentic-ci/openshell`) |
 | `entrypoint.sh` | Container entrypoint (auth, model provider, MCP, git credential setup) |
 | `deployment.yaml` | OpenShift manifests (ImageStream, BuildConfig, ConfigMaps, PVC, Deployment) |
 
@@ -43,7 +43,7 @@ podman build --platform linux/amd64 -t codex:latest -f Containerfile .
 
 | | RHOAI (Containerfile) | Source (Containerfile.base) | OpenShell (Containerfile.openshell) |
 |--|----------------------|---------------------------|-------------------------------------|
-| **Base** | UBI 9 minimal | UBI 9 minimal (multi-stage) | openshell-base |
+| **Base** | UBI 9 minimal | UBI 9 minimal (multi-stage) | RHEL 10 (OpenShell) |
 | **Codex install** | npm (pre-built binary) | Compiled from source (Rust) | npm install in image |
 | **Build time** | ~1 min | ~12 min (32GB RAM required) | ~1 min |
 | **Runtime** | Standalone pod, `oc exec` | Standalone pod, `oc exec` | OpenShell gateway sandbox |
