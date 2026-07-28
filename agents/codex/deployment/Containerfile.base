@@ -1,0 +1,149 @@
+# Codex CLI Base Image
+#
+# Multi-stage build that compiles Codex CLI from source (Apache 2.0)
+# and produces a clean UBI 9 minimal runtime image. This is an alternative
+# to the npm-based Containerfile for supply chain auditable builds.
+#
+# The builder uses cross-compilation so it runs natively on the host
+# (e.g., ARM64 on Apple Silicon) while producing an x86_64 binary.
+# This avoids QEMU emulation which crashes rustc with SIGSEGV.
+# Cross-compiling requires 32GB+ RAM in the podman VM.
+#
+# Build:
+#   podman build --platform linux/amd64 \
+#     -t codex-base:latest \
+#     -f Containerfile.base .
+#
+# Build with specific version (git tag):
+#   podman build --platform linux/amd64 \
+#     --build-arg CODEX_VERSION=rust-v0.144.0 \
+#     -t codex-base:0.144.0 \
+#     -f Containerfile.base .
+#
+# License: Apache-2.0 (Codex CLI), Apache-2.0 (this file)
+
+# =============================================================================
+# Stage 1: Builder — cross-compile Codex from source
+# =============================================================================
+# $BUILDPLATFORM ensures this stage runs natively (no QEMU).
+# We cross-compile to the $TARGETPLATFORM using Rust's --target flag.
+
+FROM --platform=$BUILDPLATFORM docker.io/library/rust:1.87.0-bookworm AS builder
+
+ARG CODEX_VERSION=rust-v0.144.0
+ARG TARGETARCH
+
+# Cross-compilation environment for C/C++ dependencies (openssl, v8, lzma, etc.)
+ENV CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc \
+    CXX_x86_64_unknown_linux_gnu=x86_64-linux-gnu-g++ \
+    CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc \
+    PKG_CONFIG_ALLOW_CROSS=1 \
+    PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig \
+    OPENSSL_DIR=/usr \
+    OPENSSL_INCLUDE_DIR=/usr/include/x86_64-linux-gnu \
+    OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
+
+# Install system build deps + cross-compilation toolchain
+# Enable amd64 as a foreign architecture for cross-compilation headers
+RUN dpkg --add-architecture amd64 \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        git pkg-config make cmake \
+        libssl-dev \
+        # x86_64 cross-compilation toolchain
+        gcc-x86-64-linux-gnu g++-x86-64-linux-gnu \
+        libc6-dev-amd64-cross \
+        # x86_64 headers for cross-compiling native dependencies
+        libssl-dev:amd64 \
+        liblzma-dev:amd64 \
+        libcap-dev:amd64 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone source first so we can read its rust-toolchain.toml
+RUN git clone --depth 1 --branch "${CODEX_VERSION}" \
+        https://github.com/openai/codex.git /src
+
+# The repo pins a specific Rust version via rust-toolchain.toml (e.g., 1.95.0).
+# cargo auto-installs this toolchain but only for the native arch.
+# We must add the x86_64 target to the PROJECT's pinned toolchain, not the
+# image default, otherwise cargo can't find the x86_64 standard library.
+RUN cd /src/codex-rs \
+    && PINNED=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml) \
+    && echo "Project pins Rust ${PINNED}" \
+    && rustup toolchain install "${PINNED}" \
+    && rustup target add x86_64-unknown-linux-gnu --toolchain "${PINNED}" \
+    && mkdir -p /root/.cargo \
+    && printf '[target.x86_64-unknown-linux-gnu]\nlinker = "x86_64-linux-gnu-gcc"\n' \
+       >> /root/.cargo/config.toml
+
+WORKDIR /src/codex-rs
+
+# Build
+# The upstream release profile uses thin LTO which requires 20GB+ RAM
+# during cross-compilation linking. Disable it for cross builds —
+# the binary is functionally identical, just slightly larger.
+RUN CARGO_PROFILE_RELEASE_LTO=false \
+    cargo build --release --target x86_64-unknown-linux-gnu \
+        --bin codex --bin bwrap --bin codex-code-mode-host \
+    && cp target/x86_64-unknown-linux-gnu/release/codex /opt/codex \
+    && cp target/x86_64-unknown-linux-gnu/release/bwrap /opt/bwrap \
+    && cp target/x86_64-unknown-linux-gnu/release/codex-code-mode-host /opt/codex-code-mode-host \
+    && chmod +x /opt/codex /opt/bwrap /opt/codex-code-mode-host \
+    && rm -rf target /src /usr/local/cargo/registry
+
+# =============================================================================
+# Stage 2: Runtime — clean UBI 9 minimal
+# =============================================================================
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:8201445bebcb5bd4fe23fcc2a76cd5fec029ab401d270926a1563c03b36f0137
+
+ARG CODEX_VERSION=rust-v0.144.0
+ARG USER_NAME=codex-agent
+ARG USER_UID=1001
+ARG USER_GID=0
+
+LABEL name="codex-base" \
+      version="${CODEX_VERSION}" \
+      vendor="Red Hat" \
+      summary="Codex CLI base image for OpenShift AI" \
+      description="OpenAI Codex CLI (Apache 2.0) compiled from source on UBI 9 minimal" \
+      license="Apache-2.0" \
+      io.openshift.tags="codex,agent,cli" \
+      io.k8s.description="Codex CLI coding agent base image"
+
+# System dependencies
+# - git: Version control (agent clones repos, makes commits)
+# - jq: JSON processor (config manipulation)
+# - tar: Required by oc cp for file retrieval
+# - nodejs + npm: Runtime for npx-based MCP servers
+# Note: curl-minimal is pre-installed in ubi-minimal; full curl conflicts
+RUN microdnf install -y --nodocs \
+        git \
+        jq \
+        tar \
+        nodejs \
+        npm \
+    && microdnf clean all \
+    && rm -rf /var/cache/yum
+
+# Copy the compiled binaries from the builder
+COPY --from=builder /opt/codex /usr/local/bin/codex
+COPY --from=builder /opt/bwrap /usr/local/bin/bwrap
+COPY --from=builder /opt/codex-code-mode-host /usr/local/bin/codex-code-mode-host
+
+# Create non-root user (OpenShift restricted-v2 SCC compatible)
+RUN useradd -u ${USER_UID} -g ${USER_GID} -d /home/${USER_NAME} -m -s /bin/bash ${USER_NAME}
+
+# Workspace and config directories
+RUN mkdir -p /workspace/projects /home/${USER_NAME}/.codex \
+    && chown -R ${USER_UID}:${USER_GID} /workspace /home/${USER_NAME} \
+    && chmod -R 775 /workspace /home/${USER_NAME}
+
+ENV HOME="/home/${USER_NAME}" \
+    PATH="/home/${USER_NAME}/.local/bin:${PATH}"
+
+# Verify
+RUN codex --version
+
+USER ${USER_UID}
+WORKDIR /workspace/projects
+ENTRYPOINT ["codex"]

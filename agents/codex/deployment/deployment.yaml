@@ -1,0 +1,234 @@
+# Codex CLI — OpenShift Deployment (vLLM)
+#
+# Deploys Codex CLI as a persistent pod on OpenShift, connected to a
+# vLLM inference endpoint via the OpenAI Responses API.
+#
+# Prerequisites:
+#   - oc CLI logged into an OpenShift cluster
+#   - Upstream vLLM v0.25.1+ serving /v1/responses with tool calling enabled
+#     (non-harmony models only — tested: Qwen3.6-27B + qwen3_coder, Qwen3-32B + hermes)
+#
+# Usage:
+#   oc new-project <your-namespace>
+#   oc apply -f deployment.yaml
+#   oc start-build codex --from-dir=. --follow
+#   oc rollout status deployment/codex
+#
+# Then connect:
+#   oc exec -it deployment/codex -- bash -l
+#   codex-run exec "What files are in the current directory?"
+#
+# Update the OPENAI_BASE_URL, OPENAI_MODEL, and OPENAI_API_KEY below
+# to match your vLLM endpoint.
+
+---
+# =============================================================================
+# ImageStream — allows the Deployment to reference the image by name
+# =============================================================================
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: codex
+  labels:
+    app: codex
+spec:
+  lookupPolicy:
+    local: true
+
+---
+# =============================================================================
+# BuildConfig — binary source build using the Containerfile
+# =============================================================================
+# Recommended: build locally and push to the internal registry.
+# See the README for full instructions.
+#
+#   podman build --platform linux/amd64 -t codex:latest -f Containerfile .
+#   podman push <registry>/<namespace>/codex:latest
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: codex
+  labels:
+    app: codex
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: codex:latest
+  triggers: []
+
+---
+# =============================================================================
+# ConfigMap — Codex config.toml (model provider, preferences)
+# =============================================================================
+# The entrypoint auto-configures the model provider from OPENAI_BASE_URL
+# and OPENAI_MODEL env vars. Use this ConfigMap only if you need additional
+# config.toml settings beyond what the entrypoint generates.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: codex-config
+  labels:
+    app: codex
+data:
+  config.toml: |
+    # Codex CLI configuration
+    # Model and provider are auto-configured by entrypoint.sh
+    # when OPENAI_BASE_URL and OPENAI_MODEL are set.
+    #
+    # Add additional config here if needed, for example:
+    # notify = "off"
+
+---
+# =============================================================================
+# ConfigMap — MCP server definitions (TOML format)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: codex-mcp-config
+  labels:
+    app: codex
+data:
+  mcp-servers.toml: |
+    # MCP server definitions in Codex-native TOML format.
+    # Add servers here:
+    #
+    # [mcp_servers.my-api]
+    # url = "https://mcp.example.com/v1"
+    # bearer_token_env_var = "API_TOKEN"
+    #
+    # [mcp_servers.local-tool]
+    # command = "npx"
+    # args = ["-y", "@some/mcp-server"]
+
+---
+# =============================================================================
+# PersistentVolumeClaim — workspace persistence across restarts
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: codex-workspace
+  labels:
+    app: codex
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# =============================================================================
+# Deployment
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: codex
+  labels:
+    app: codex
+spec:
+  replicas: 1
+  # Recreate strategy required because the PVC is ReadWriteOnce —
+  # the old pod must release the volume before the new pod can mount it.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: codex
+  template:
+    metadata:
+      labels:
+        app: codex
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: codex
+          image: codex:latest
+          imagePullPolicy: Always
+          command: ["entrypoint.sh"]
+          args: ["sleep", "infinity"]
+          env:
+            - name: HOME
+              value: "/home/codex-agent"
+            - name: CODEX_HOME
+              value: "/workspace/.codex"
+
+            # ── vLLM connection ──────────────────────────────────────
+            # UPDATE THESE to match your vLLM endpoint.
+            # Create the secret first:
+            #   oc create secret generic codex-api-key --from-literal=api-key=dummy
+            - name: OPENAI_BASE_URL
+              value: "http://vllm-svc.your-namespace.svc.cluster.local/v1"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: codex-api-key
+                  key: api-key
+            - name: OPENAI_MODEL
+              value: "your-model-id"
+            # CODEX_API_KEY is required for codex exec (headless mode).
+            # The entrypoint propagates OPENAI_API_KEY, but only when
+            # running codex directly — not in sleep infinity + oc exec mode.
+            - name: CODEX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: codex-api-key
+                  key: api-key
+
+            # ── Sandbox ──────────────────────────────────────────────
+            # Container itself is the isolation boundary
+            - name: CODEX_SANDBOX
+              value: "danger-full-access"
+
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: codex-config
+              mountPath: /etc/codex-config/config.toml
+              subPath: config.toml
+            - name: mcp-config
+              mountPath: /etc/codex-mcp/mcp-servers.toml
+              subPath: mcp-servers.toml
+              readOnly: true
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+
+      volumes:
+        - name: workspace
+          persistentVolumeClaim:
+            claimName: codex-workspace
+        - name: codex-config
+          configMap:
+            name: codex-config
+            optional: true
+        - name: mcp-config
+          configMap:
+            name: codex-mcp-config
+            optional: true
