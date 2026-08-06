@@ -322,7 +322,19 @@ NAME      CREATED              PHASE
 opencode  2026-07-24 18:45:00  Ready
 ```
 
-#### Step 7: Configure OpenCode and test
+#### Step 7: Allow egress to your model endpoint
+
+OpenShell sandboxes enforce network egress policies — the `sandbox` user's outbound traffic is blocked by default. Allow traffic to your vLLM endpoint:
+
+```bash
+openshell policy update opencode \
+  --add-endpoint <vllm-service>.<vllm-namespace>.svc.cluster.local:<port>:read-only:rest:enforce \
+  --wait
+```
+
+> **Note:** Commands run as root via `oc exec` bypass the policy (they don't go through the supervisor). Only the `sandbox` user's traffic is policy-enforced, so a raw `curl` as root may succeed while OpenCode (running as `sandbox`) fails silently.
+
+#### Step 8: Configure OpenCode and test
 
 The sandbox supervisor runs as root (PID 1). OpenCode runs as the `sandbox` user. You need to prepare the home directory, write the OpenCode provider config, and initialize a git workspace.
 
@@ -351,7 +363,11 @@ cat > /home/sandbox/.config/opencode/opencode.json << '\''CONF'\''
       },
       "models": {
         "<model-name>": {
-          "name": "<model-name>"
+          "name": "<model-name>",
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          }
         }
       }
     }
@@ -362,6 +378,10 @@ cat > /home/sandbox/.config/opencode/opencode.json << '\''CONF'\''
 }
 CONF
 chown $SANDBOX_UID:$SANDBOX_UID /home/sandbox/.config/opencode/opencode.json
+
+# NOTE: Adjust "limit" values to match your model'\''s context window.
+# OpenCode defaults to 32000 output tokens — models with <=32k context
+# will silently hang. Set "output" well below your model'\''s context limit.
 
 # Initialize git workspace (OpenCode requires a git repo)
 cd /workspace
@@ -427,9 +447,9 @@ oc get sandbox opencode -n <your-namespace> -o yaml | grep -A5 conditions
 
 Common causes: SCC not granted, image pull failure, or the Sandbox CRD controller not running.
 
-**`EACCES: permission denied, mkdir '/home/sandbox/.local'`:** The sandbox user UID is assigned by OpenShift's namespace UID range (not a fixed 1001). You must create and `chown` the home directory before running OpenCode (Step 7).
+**`EACCES: permission denied, mkdir '/home/sandbox/.local'`:** The sandbox user UID is assigned by OpenShift's namespace UID range (not a fixed 1001). You must create and `chown` the home directory before running OpenCode (Step 8).
 
-**OpenCode errors with `not in a git directory`:** OpenCode requires a git repository in the working directory. Run `git init` in `/workspace` (Step 7).
+**OpenCode errors with `not in a git directory`:** OpenCode requires a git repository in the working directory. Run `git init` in `/workspace` (Step 8).
 
 **Helm install fails with `ClusterRole already exists`:** Another OpenShell installation on the cluster already created the `openshell-node-reader` ClusterRole. Add `--set nodeReader.enabled=false` to the Helm install command.
 
@@ -437,22 +457,15 @@ Common causes: SCC not granted, image pull failure, or the Sandbox CRD controlle
 
 **Image pull errors:** The sandbox image must be in the cluster's internal registry. Build it via `oc start-build` (Step 5), not with local `podman build`.
 
-**OpenCode cannot reach the model endpoint or MLflow:** OpenShell sandboxes may enforce network egress policies that block outbound traffic by default. If OpenCode fails to connect to vLLM or MLflow, update the sandbox policy to allow the required endpoints:
+**OpenCode hangs silently when connecting to vLLM or MLflow:** The sandbox user's egress is policy-enforced — verify you completed [Step 7](#step-7-allow-egress-to-your-model-endpoint). Note that `oc exec` as root bypasses the policy, so a raw `curl` may succeed while OpenCode (running as `sandbox`) fails.
 
-```bash
-openshell policy update opencode \
-  --add-endpoint <vllm-service>.<vllm-namespace>.svc.cluster.local:<port>:read-only:rest:enforce \
-  --add-endpoint <mlflow-service>.<rhoai-namespace>.svc.cluster.local:<port>:read-only:rest:enforce \
-  --wait
-```
-
-See the [OpenShell policy documentation](https://docs.nvidia.com/openshell/reference/default-policy) for details on egress rules.
+**OpenCode hangs with no output on models with <=32k context:** OpenCode defaults to requesting 32000 output tokens. If your model's context window is 32k or less, this overflows and causes a silent compaction loop. Set `limit.output` in the model config to a value well below the context window (see [Step 8](#step-8-configure-opencode-and-test)).
 
 ---
 
 ## Configuration (Kustomize Deployment)
 
-The settings below apply to the kustomize-based deployment (web and CLI modes). For OpenShell sandbox configuration, see [Step 7](#step-7-configure-opencode-and-test) in the OpenShell section.
+The settings below apply to the kustomize-based deployment (web and CLI modes). For OpenShell sandbox configuration, see [Step 8](#step-8-configure-opencode-and-test) in the OpenShell section.
 
 | Setting | Where to change | Notes |
 |---------|----------------|-------|
@@ -708,7 +721,15 @@ oc adm policy add-role-to-user edit -z ${OPENSHELL_NAME}-sandbox -n <your-namesp
 
 #### 3. Set up the MLflow plugin, TLS, and experiment
 
-After the sandbox is running and OpenCode is configured ([Step 7](#step-7-configure-opencode-and-test)), run the following setup steps.
+After the sandbox is running and OpenCode is configured ([Step 8](#step-8-configure-opencode-and-test)), run the following setup steps.
+
+**Allow egress to the MLflow endpoint** (add to the policy from [Step 7](#step-7-allow-egress-to-your-model-endpoint)):
+
+```bash
+openshell policy update opencode \
+  --add-endpoint mlflow.<rhoai-namespace>.svc.cluster.local:8443:read-only:rest:enforce \
+  --wait
+```
 
 **Install the plugin and patch it with the pre-built version** (the published npm package does not include the workspace header fix):
 
@@ -784,6 +805,8 @@ opencode
 
 Chat with OpenCode, then exit (`Ctrl+C`). The `@mlflow/opencode` plugin exports traces when the session ends.
 
+> **Important:** Use interactive `opencode` (not `opencode run`). The headless `run` command exits before the plugin can flush traces to MLflow.
+
 #### 5. View traces
 
 ```bash
@@ -824,7 +847,7 @@ For full A2A deployment instructions, see [deployment/README-a2a.md](deployment/
 
 - **SCC**: The sandbox pod requires the `privileged` SCC for the OpenShell supervisor (granted to the sandbox SA in [Step 3](#step-3-grant-the-privileged-scc)). The OpenCode process itself runs as the non-root `sandbox` user.
 - **Auth**: The OpenShell gateway handles sandbox authentication via mTLS. No OAuth proxy is used.
-- **Secrets**: Model endpoint credentials are passed via the OpenCode config file written in [Step 7](#step-7-configure-opencode-and-test). For production, consider mounting credentials from a Kubernetes Secret.
+- **Secrets**: Model endpoint credentials are passed via the OpenCode config file written in [Step 8](#step-8-configure-opencode-and-test). For production, consider mounting credentials from a Kubernetes Secret.
 
 ---
 
