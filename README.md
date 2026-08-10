@@ -19,7 +19,9 @@ Agents are organized by framework. Pick one and follow its README:
 | **LangGraph** | [ReAct Agent](./agents/langgraph/templates/react_agent/) | General-purpose agent using a ReAct loop: it reasons and calls tools (e.g. search, math) step by step. Built with LangGraph and LangChain. |
 | **LangGraph** | [Agentic RAG](./agents/langgraph/templates/agentic_rag/) | RAG agent that indexes documents in a vector store (Milvus) and retrieves relevant chunks to augment the LLM's answers with your own data. |
 | **LangGraph** | [ReAct + DB Memory](./agents/langgraph/templates/react_with_database_memory/) | ReAct agent with PostgreSQL-backed conversation memory. Full chat history is persisted in the database while a FIFO sliding window keeps only the last N messages in the LLM context. |
+| **LangGraph** | [CI Failure Summarizer](./agents/langgraph/templates/ci_failure_summarizer/) | Spike agent that ingests QG4 GitHub Actions failures, groups incidents in PostgreSQL, composes triage summaries, and posts to Slack via manual `POST /summarize` trigger. |
 | **LangGraph** | [Human-in-the-Loop](./agents/langgraph/templates/human_in_the_loop/) | ReAct agent with a human approval step. The agent pauses before executing tool calls and waits for user confirmation, enabling oversight of critical actions. |
+| **LangGraph** | [Guardrailed Agent](./agents/langgraph/examples/guardrailed_agent/) | Banking agent with NeMo Guardrails safety layer. Content safety, topic boundaries, and regex filtering via the proxy pattern. Two profiles: `local` (self-check) and `nemoguard` (supports dedicated NIM classifiers per layer). |
 | **LlamaIndex** | [WebSearch Agent](./agents/llamaindex/templates/websearch_agent/) | Agent built on LlamaIndex that uses a web search tool to query the internet and use the results in its answers. |
 | **CrewAI** | [WebSearch Agent](./agents/crewai/templates/websearch_agent/) | CrewAI-based agent with a web search tool to query the internet and answer user questions. |
 | **Vanilla Python** | [OpenAI Responses Agent](./agents/vanilla_python/templates/openai_responses_agent/) | Minimal agent with no framework: only the OpenAI Python client and an Action/Observation loop with tools. Use with OpenAI or any compatible API. |
@@ -60,6 +62,7 @@ agentic-starter-kits/
 │   │   │   ├── react_agent/
 │   │   │   ├── agentic_rag/
 │   │   │   ├── react_with_database_memory/
+│   │   │   ├── ci_failure_summarizer/
 │   │   │   └── human_in_the_loop/
 │   │   ├── examples/                    # Business use-case demos
 │   │   └── deployment/                  # Helm chart for this framework
@@ -104,6 +107,7 @@ Tests require a running agent. Set the target URL via environment variables:
 | `CREWAI_WEBSEARCH_AGENT_URL` | CrewAI Websearch agent tests |
 | `AGENTIC_RAG_AGENT_URL` | LangGraph Agentic RAG agent tests |
 | `DB_MEMORY_AGENT_URL` | LangGraph DB Memory agent tests |
+| `CI_FAILURE_SUMMARIZER_AGENT_URL` | LangGraph CI Failure Summarizer agent tests |
 | `LLAMAINDEX_WEBSEARCH_AGENT_URL` | LlamaIndex Websearch agent tests |
 | `LANGFLOW_TOOL_CALLING_AGENT_URL` | Langflow Simple Tool Calling agent tests |
 | `LANGFLOW_FLOW_ID` | Langflow flow ID (changes on re-import) |
@@ -125,6 +129,7 @@ See `tests/behavioral/` for full details.
 - [Adding a New Agent](./docs/adding-a-new-agent.md) — How to contribute a new agent template
 - [Adding Behavioral Tests](./docs/adding-behavioral-tests.md) — How to add test coverage for an agent
 - [Adding an EvalHub Agent Integration](./docs/adding-evalhub-agent-integration.md) — How to integrate a new agent into the EvalHub evaluation pipeline
+- [Guardrails](./docs/guardrails.md) — Adding safety rails to agents (NeMo Guardrails vs Guardrails Orchestrator)
 - [llm-d Deployment](./docs/llm-d-deployment.md) — Deploy llm-d for intelligent LLM inference routing on OpenShift AI
 
 ## Claude Code Skills
